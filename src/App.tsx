@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useEffect, useCallback } from "react";
 import * as XLSX from "xlsx";
 
@@ -108,6 +109,97 @@ function buildClubsByLeague(clubsData) {
   Object.keys(result).forEach(l => result[l].sort());
   return result;
 }
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  FALLBACK DELIVERABLES (used when sheet fetch fails or returns empty)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const FALLBACK_DEPT_ITEMS = {
+  "Corp Partnerships": {
+    external:[
+      {name:"Stadium Naming Rights Valuation",rate:20000,cat:"Valuation",index_score:5,recurring:false,examples:["Naming rights valuation for new stadium","Renewal pricing analysis"]},
+      {name:"Rate Card and Inventory Analysis",rate:4250,cat:"Valuation",index_score:4,recurring:false,examples:["Full sponsorship inventory audit","Rate card benchmarking"]},
+      {name:"Kit Asset Valuation",rate:5000,cat:"Valuation",index_score:5,recurring:false,examples:["Jersey sleeve valuation","Kit partner ROI analysis"]},
+      {name:"LED & Field Board Pricing",rate:3000,cat:"Valuation",index_score:3,recurring:false,examples:["LED board inventory pricing","Digital signage valuation"]},
+      {name:"Standard Intelligence Product",rate:250,cat:"Analysis",index_score:2,recurring:true,examples:["Cluster report","Category analysis","Benchmark report"]},
+      {name:"Partnership Performance Product",rate:250,cat:"Analysis",index_score:2,recurring:true,examples:["KORE recap","Annual partnership recap"]},
+      {name:"Category Analysis",rate:75,cat:"Analysis",index_score:1,recurring:false,examples:["Insurance category","Automotive category analysis"]},
+      {name:"KORE Recap Report",rate:5000,cat:"Analysis",index_score:4,recurring:false,examples:["Full KORE platform recap","Sponsorship ROI summary"]},
+    ],
+    internal:[
+      {name:"Corporate Partnerships Advisory",rate:75,cat:"Advisory",index_score:1,recurring:true,examples:["Partner check-in","Strategy advisory call"]},
+      {name:"Partnership Strategy Session",rate:150,cat:"Strategy",index_score:2,recurring:false,examples:["Category exclusivity strategy","Inventory bundling session"]},
+    ],
+  },
+  "Marketing": {
+    external:[
+      {name:"Market Analysis",rate:2500,cat:"Research",index_score:4,recurring:false,examples:["DMA market sizing","Fan base demographic study"]},
+      {name:"Fanbase Trending Report",rate:1000,cat:"Research",index_score:3,recurring:false,examples:["Social sentiment analysis","Fan engagement trends"]},
+      {name:"Broadcast Report",rate:250,cat:"Analysis",index_score:2,recurring:true,examples:["Weekly broadcast metrics","TV viewership recap"]},
+      {name:"Social Media Report",rate:250,cat:"Analysis",index_score:2,recurring:true,examples:["Monthly social report","Platform performance recap"]},
+      {name:"Annual Club Recap Report",rate:250,cat:"Analysis",index_score:2,recurring:true,examples:["Season recap report","Year in review"]},
+      {name:"Marketing Audit",rate:75,cat:"Analysis",index_score:3,recurring:false,examples:["Digital presence audit","Campaign effectiveness review"]},
+      {name:"Go to Market Strategy",rate:500,cat:"Strategy",index_score:4,recurring:false,examples:["Season launch strategy","New market entry plan"]},
+      {name:"Web / CX Audit",rate:750,cat:"Analysis",index_score:3,recurring:false,examples:["Website UX audit","Digital experience review"]},
+      {name:"Marketing Playbook",rate:1000,cat:"Strategy",index_score:3,recurring:false,examples:["Campaign playbook","Content strategy guide"]},
+    ],
+    internal:[
+      {name:"Social Media Report",rate:250,cat:"Analysis",index_score:2,recurring:true,leagueSelect:true,examples:["Championship social recap","League One social metrics"]},
+      {name:"Marketing Advisory",rate:75,cat:"Advisory",index_score:1,recurring:true,examples:["Marketing check-in call","Campaign advisory"]},
+      {name:"Monthly Marketing Newsletter",rate:100,cat:"Creative",index_score:1,recurring:true,examples:["Monthly league newsletter","Club marketing digest"]},
+    ],
+  },
+  "Consumer Products": {
+    external:[
+      {name:"CPG Newsletter",rate:100,cat:"Creative",index_score:1,recurring:true,examples:["Monthly CPG newsletter","League-wide digest"]},
+      {name:"Food and Beverage Analysis",rate:1500,cat:"Analysis",index_score:3,recurring:false,examples:["Concessions revenue analysis","F&B benchmarking study"]},
+      {name:"Consumer Segmentation Report",rate:1000,cat:"Research",index_score:4,recurring:false,examples:["Fan segmentation study","Customer persona analysis"]},
+    ],
+    internal:[
+      {name:"Consumer Products Advisory",rate:75,cat:"Advisory",index_score:1,recurring:true,examples:["Product check-in","Advisory call"]},
+    ],
+  },
+  "Ticketing": {
+    external:[
+      {name:"Ticketing Analysis",rate:500,cat:"Analysis",index_score:3,recurring:false,examples:["Season ticket audit","Pricing analysis"]},
+      {name:"Club Revenue Pathway Model",rate:2500,cat:"Valuation",index_score:5,recurring:false,examples:["Multi-year revenue model","Ticket revenue pathway"]},
+      {name:"Dynamic Pricing Model",rate:3500,cat:"Valuation",index_score:4,recurring:false,examples:["Demand-based pricing build","Variable pricing structure"]},
+      {name:"Season Ticket Revenue Model",rate:3000,cat:"Valuation",index_score:4,recurring:false,examples:["ST revenue projection","Package revenue model"]},
+      {name:"Stadium Pricing & Yield Management Analysis",rate:3500,cat:"Analysis",index_score:4,recurring:false,examples:["Section-by-section pricing","Yield optimization model"]},
+      {name:"Attendance Recovery Plan",rate:2500,cat:"Strategy",index_score:4,recurring:false,examples:["Win-back strategy","Attendance turnaround plan"]},
+      {name:"Ticketing Playbook / Framework",rate:1500,cat:"Strategy",index_score:3,recurring:false,examples:["Best-practice playbook","ST sales framework"]},
+      {name:"Season Ticket Retention Report",rate:250,cat:"Analysis",index_score:2,recurring:true,examples:["Renewal rate tracking","Churn analysis"]},
+      {name:"Group Sales Performance Report",rate:250,cat:"Analysis",index_score:2,recurring:true,examples:["Group sales recap","Segment performance"]},
+      {name:"Ticketing Executive Summary",rate:250,cat:"Analysis",index_score:2,recurring:true,examples:["Leadership ticketing brief","Board-ready summary"]},
+    ],
+    internal:[
+      {name:"Ticketing Advisory",rate:75,cat:"Advisory",index_score:1,recurring:true,examples:["Ticketing check-in","Advisory call"]},
+      {name:"Ticketing Check-In Call",rate:75,cat:"Advisory",index_score:1,recurring:true,examples:["Weekly check-in","Status update call"]},
+    ],
+  },
+  "Youth / Facilities": {
+    external:[
+      {name:"Youth Program Analysis",rate:1500,cat:"Analysis",index_score:3,recurring:false,examples:["Academy program review","Youth league audit"]},
+      {name:"Facilities Assessment",rate:2000,cat:"Analysis",index_score:3,recurring:false,examples:["Facility condition report","Standards compliance review"]},
+      {name:"Youth Strategy Deck",rate:2500,cat:"Strategy",index_score:4,recurring:false,examples:["Academy strategy plan","Youth development roadmap"]},
+      {name:"Facilities Feasibility Study",rate:3000,cat:"Analysis",index_score:4,recurring:false,examples:["New facility feasibility","Site evaluation report"]},
+      {name:"Facilities Asset Valuation",rate:4000,cat:"Valuation",index_score:4,recurring:false,examples:["Facility valuation","Asset financial model"]},
+      {name:"Facilities Revenue Strategy",rate:3500,cat:"Strategy",index_score:4,recurring:false,examples:["Revenue generation plan","Sponsorship integration"]},
+    ],
+    internal:[
+      {name:"Youth / Facilities Advisory",rate:75,cat:"Advisory",index_score:1,recurring:true,examples:["Advisory call","Check-in session"]},
+    ],
+  },
+  "League Initiatives": {
+    internal:[
+      {name:"Leadership Briefing",rate:500,cat:"Strategy",index_score:4,recurring:false,examples:["Executive briefing","Board presentation"]},
+      {name:"Strategic Planning Session",rate:750,cat:"Strategy",index_score:4,recurring:false,examples:["League strategy session","Annual planning meeting"]},
+      {name:"Institutional Advisory",rate:75,cat:"Advisory",index_score:1,recurring:true,examples:["Leadership advisory","Governance guidance"]},
+      {name:"Cross-Department Initiative",rate:500,cat:"Strategy",index_score:4,recurring:false,examples:["Cross-functional project","League-wide initiative"]},
+    ],
+  },
+};
 
 function buildDeptItems(deliverables) {
   const map = {};
@@ -653,164 +745,394 @@ function PieChart({ slices, title, centerLabel, centerSub, size=200 }) {
 //  DASHBOARD
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  RACK RATE PLACEHOLDERS (used when sheet rate is 0)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const RACK_RATE_MAP = {
+  // Corp Partnerships
+  "Stadium Naming Rights Valuation": 20000,
+  "Rate Card and Inventory Analysis": 4250,
+  "Kit Asset Valuation": 5000,
+  "LED & Field Board Pricing": 3000,
+  "Standard Intelligence Product": 250,
+  "Partnership Performance Product": 250,
+  "Category Analysis": 75,
+  "KORE Recap Report": 5000,
+  "Strategic Advisory": 75,
+  "Partnership Strategy Session": 150,
+  // Marketing
+  "Market Analysis": 2500,
+  "Fanbase Trending Report": 1000,
+  "Broadcast Report": 250,
+  "Social Media Report": 250,
+  "Annual Club Recap Report": 250,
+  "Marketing Audit": 75,
+  "Go to Market Strategy": 500,
+  "Monthly Marketing Newsletter": 100,
+  "1-on-1 Consultant Call": 75,
+  "Marketing All-Call": 75,
+  "Web / CX Audit": 750,
+  "Marketing Budget Audit": 750,
+  "Marketing Playbook": 1000,
+  "Marketing Case Study": 500,
+  "Quarterly Marketing Training": 300,
+  "Revenue Leaders Call": 150,
+  "Social Media Strategy Call": 150,
+  "Expansion Marketing Consulting": 1500,
+  "In-Person Marketing Visit": 300,
+  "CPG Newsletter": 100,
+  // Ticketing
+  "Ticketing Analysis": 500,
+  "Club Revenue Pathway Model": 2500,
+  "Season Ticket Retention Report": 250,
+  "Group Sales Performance Report": 250,
+  "Comp Ticket Benchmarking Study": 750,
+  "Dynamic Pricing Model": 3500,
+  "Season Ticket Revenue Model": 3000,
+  "Group Sales Revenue Model": 2000,
+  "Ticketing Executive Summary": 250,
+  "Ticket Sales Training Session": 500,
+  "Stadium Pricing & Yield Management Analysis": 3500,
+  "Ticketing Analysis & Consultancy": 500,
+  "Attendance Recovery Plan": 2500,
+  "Ticketing Department Staffing Analysis": 1000,
+  "Custom Ticketing Model Build": 3000,
+  "Ticketing Check-In Call": 75,
+  "Ticketing Playbook / Framework": 1500,
+  // Youth / Facilities
+  "Youth Program Analysis": 1500,
+  "Facilities Assessment": 2000,
+  "Youth Strategy Deck": 2500,
+  "Strategic Planning Session": 750,
+  "Club Assessment Report": 1500,
+  "Market Research Study": 2000,
+  "Facilities Benchmarking Report": 1500,
+  "Facilities Feasibility Study": 3000,
+  "Facilities Asset Valuation": 4000,
+  "Facilities Revenue Strategy": 3500,
+  "Youth Programming Design": 2000,
+  "Academy Staffing & Operations Plan": 1500,
+  "Community Engagement Strategy": 1000,
+  "Fan & Volunteer Development Program": 750,
+  // Default
+  "default": 250,
+};
+
+function getRackRate(entry) {
+  if (entry.rate && entry.rate > 0) return entry.rate;
+  return RACK_RATE_MAP[entry.name] || RACK_RATE_MAP["default"];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  SVG BAR CHART
+// ─────────────────────────────────────────────────────────────────────────────
+
+function HBarChart({ data, color, valueLabel, height=56 }) {
+  const [hovered, setHovered] = useState(null);
+  const max = Math.max(...data.map(d=>d.value), 1);
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      {data.map((d,i) => {
+        const pct = d.value/max*100;
+        const isH = hovered===i;
+        const barColor = d.color || color;
+        return (
+          <div key={d.label} onMouseEnter={()=>setHovered(i)} onMouseLeave={()=>setHovered(null)}
+            style={{display:"flex",alignItems:"center",gap:12,cursor:"default"}}>
+            <div style={{width:140,flexShrink:0,textAlign:"right",fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:600,color:isH?"#111827":"#374151",transition:"color .15s"}}>{d.label}</div>
+            <div style={{flex:1,height:height,background:"#F3F4F6",borderRadius:8,overflow:"hidden",position:"relative"}}>
+              <div style={{width:`${pct}%`,height:"100%",background:barColor,borderRadius:8,opacity:isH?1:.82,transition:"all .3s",boxShadow:isH?`0 2px 12px ${barColor}66`:"none"}}/>
+            </div>
+            <div style={{width:80,flexShrink:0,fontFamily:"'DM Serif Display',serif",fontSize:20,fontWeight:800,color:barColor}}>{d.value.toLocaleString()}</div>
+            {d.sub && <div style={{width:60,flexShrink:0,fontSize:11,color:"#9CA3AF",fontFamily:"'DM Sans',sans-serif"}}>{d.sub}</div>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  SVG DONUT CHART
+// ─────────────────────────────────────────────────────────────────────────────
+
+function DonutChart({ slices, size=220, title, subtitle }) {
+  const [hovered, setHovered] = useState(null);
+  const total = slices.reduce((s,sl)=>s+sl.value,0);
+  if (!total) return null;
+  const r = size/2-16, cx=size/2, cy=size/2;
+  let cumAngle = -Math.PI/2;
+  const arcs = slices.map((sl,i) => {
+    const angle = (sl.value/total)*2*Math.PI;
+    const x1=cx+r*Math.cos(cumAngle), y1=cy+r*Math.sin(cumAngle);
+    cumAngle+=angle;
+    const x2=cx+r*Math.cos(cumAngle), y2=cy+r*Math.sin(cumAngle);
+    const midAngle=cumAngle-angle/2;
+    return{...sl,x1,y1,x2,y2,large:angle>Math.PI?1:0,midAngle,pct:sl.value/total,index:i};
+  });
+  const innerR=r*0.56;
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:24,flexWrap:"wrap"}}>
+      <div style={{position:"relative",flexShrink:0}}>
+        <svg width={size} height={size} style={{overflow:"visible"}}>
+          {arcs.map((arc,i)=>{
+            const isH=hovered===i;
+            const off=isH?7:0, ox=off*Math.cos(arc.midAngle), oy=off*Math.sin(arc.midAngle);
+            return(
+              <path key={i}
+                d={`M ${cx+ox} ${cy+oy} L ${arc.x1+ox} ${arc.y1+oy} A ${r} ${r} 0 ${arc.large} 1 ${arc.x2+ox} ${arc.y2+oy} Z`}
+                fill={arc.color} stroke="#fff" strokeWidth={2.5}
+                style={{cursor:"pointer",filter:isH?`drop-shadow(0 4px 12px ${arc.color}88)`:"none",transition:"filter .15s"}}
+                onMouseEnter={()=>setHovered(i)} onMouseLeave={()=>setHovered(null)}
+              />
+            );
+          })}
+          <circle cx={cx} cy={cy} r={innerR} fill="#fff"/>
+          <text x={cx} y={cy-10} textAnchor="middle" dominantBaseline="middle"
+            style={{fontFamily:"'DM Serif Display',serif",fontSize:22,fontWeight:800,fill:"#111827"}}>
+            {hovered!==null?`${(arcs[hovered].pct*100).toFixed(0)}%`:title}
+          </text>
+          <text x={cx} y={cy+14} textAnchor="middle" dominantBaseline="middle"
+            style={{fontFamily:"'DM Sans',sans-serif",fontSize:12,fill:"#6B7280"}}>
+            {hovered!==null?arcs[hovered].label:subtitle}
+          </text>
+        </svg>
+      </div>
+      {/* Legend */}
+      <div style={{display:"flex",flexDirection:"column",gap:8,flex:1,minWidth:150}}>
+        {arcs.map((arc,i)=>(
+          <div key={i} onMouseEnter={()=>setHovered(i)} onMouseLeave={()=>setHovered(null)}
+            style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",padding:"4px 8px",borderRadius:8,background:hovered===i?arc.color+"12":"transparent",transition:"background .15s"}}>
+            <div style={{width:12,height:12,borderRadius:"50%",background:arc.color,flexShrink:0}}/>
+            <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,color:"#374151",flex:1}}>{arc.label}</span>
+            <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:700,color:arc.color}}>{(arc.pct*100).toFixed(0)}%</span>
+            <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:"#9CA3AF",width:40,textAlign:"right"}}>{arc.value.toLocaleString()}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  DASHBOARD
+// ─────────────────────────────────────────────────────────────────────────────
+
 function Dashboard({ log, onExport, clubsByLeague }) {
-  // ── Shared filters ──────────────────────────────────────────────────────────
-  const [league,     setLeague]     = useState("all");
-  const [period,     setPeriod]     = useState("all");
-  const [entryType,  setEntryType]  = useState("all"); // all | strategic | recurring
-  const [clubMetric, setClubMetric] = useState("index"); // index | count | value
-  const [deptMetric, setDeptMetric] = useState("count"); // count | strategic | recurring
+  const [league,      setLeague]      = useState("all");
+  const [entryType,   setEntryType]   = useState("all");
+  const [clubMetric,  setClubMetric]  = useState("index");
+  const [showAllClubs,setShowAllClubs]= useState(false);
+
+  // Tiered time slicer
+  const [timeGrain,   setTimeGrain]   = useState("all");   // all | year | quarter | month
+  const [timeValue,   setTimeValue]   = useState(null);    // the selected year/quarter/month
 
   const LEAGUES = ["all","Championship","League One","Super League","Expansion"];
-  const now = Date.now();
+  const LEAGUE_COLORS = {
+    "Championship":"#1D4ED8","League One":"#047857",
+    "Super League":"#7C3AED","Expansion":"#B45309","all":"#0F172A",
+  };
 
-  // ── Time filter ─────────────────────────────────────────────────────────────
+  // Derive available years from log
+  const availableYears = [...new Set(log.map(e=>new Date(e.ts).getFullYear()))].sort((a,b)=>b-a);
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const QUARTERS = ["Q1","Q2","Q3","Q4"];
+  const DEPT_COLORS = {
+    "Corp Partnerships":"#7C3AED","Marketing":"#0369A1",
+    "Consumer Products":"#B45309","Ticketing":"#047857",
+    "Youth / Facilities":"#0891B2","League Initiatives":"#4338CA",
+    "General":"#475569","Youth / Clinics":"#0891B2",
+  };
+
+  // Tiered time filter
   const timeFiltered = log.filter(e => {
-    if (period === "month") {
-      const d = new Date(e.ts), n = new Date();
-      return d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear();
-    }
-    if (period === "quarter") {
-      const d = new Date(e.ts), n = new Date();
-      return Math.floor(d.getMonth()/3)===Math.floor(n.getMonth()/3) && d.getFullYear()===n.getFullYear();
-    }
-    if (period === "year") return new Date(e.ts).getFullYear()===new Date().getFullYear();
+    if (timeGrain==="all") return true;
+    const d = new Date(e.ts);
+    if (timeGrain==="year")    return timeValue!==null && d.getFullYear()===timeValue;
+    if (timeGrain==="quarter") return timeValue!==null && Math.floor(d.getMonth()/3)===timeValue;
+    if (timeGrain==="month")   return timeValue!==null && d.getMonth()===timeValue;
     return true;
   });
 
-  // ── Entry type filter ───────────────────────────────────────────────────────
-  const filtered = timeFiltered.filter(e => {
-    if (entryType==="strategic") return !e.recurring;
-    if (entryType==="recurring") return e.recurring;
+  // Entry type filter
+  const typeFiltered = timeFiltered.filter(e => {
+    if(entryType==="strategic") return !e.recurring;
+    if(entryType==="recurring") return e.recurring;
     return true;
   });
 
-  // ── League filter (for club view only) ─────────────────────────────────────
-  const leagueFiltered = filtered.filter(e =>
-    league==="all" || e.league===league
-  );
+  // League-filtered (for charts that use it)
+  const leagueFiltered = league==="all" ? typeFiltered : typeFiltered.filter(e=>e.league===league);
+  const externalLog = leagueFiltered.filter(e=>e.type==="External");
 
-  // ── High-level counts ───────────────────────────────────────────────────────
-  const totalCount    = filtered.length;
-  const strategicCnt  = filtered.filter(e=>!e.recurring).length;
-  const recurringCnt  = filtered.filter(e=>e.recurring).length;
-  const extCnt        = filtered.filter(e=>e.type==="External").length;
-  const intCnt        = filtered.filter(e=>e.type==="Internal").length;
-  const strategicExtIdx = filtered.filter(e=>!e.recurring&&e.type==="External"&&e.index_score>0);
-  const avgIndex = strategicExtIdx.length>0
-    ? (strategicExtIdx.reduce((s,e)=>s+Number(e.index_score||1),0)/strategicExtIdx.length).toFixed(1)
-    : "—";
+  // ── Stats ────────────────────────────────────────────────────────────────
+  const total      = typeFiltered.length;
+  const strategic  = typeFiltered.filter(e=>!e.recurring).length;
+  const recurring  = typeFiltered.filter(e=>e.recurring).length;
+  const extCnt     = typeFiltered.filter(e=>e.type==="External").length;
+  const intCnt     = typeFiltered.filter(e=>e.type==="Internal").length;
+  const stratIdx   = typeFiltered.filter(e=>!e.recurring&&e.type==="External"&&e.index_score>0);
+  const avgIndex   = stratIdx.length>0?(stratIdx.reduce((s,e)=>s+Number(e.index_score||1),0)/stratIdx.length).toFixed(1):"—";
 
-  // ── Club intelligence ───────────────────────────────────────────────────────
-  const clubMap = {};
-  leagueFiltered.filter(e=>e.type==="External").forEach(e => {
-    const c = e.club||"Unknown";
-    if (!clubMap[c]) clubMap[c]={club:c,league:e.league||"",count:0,value:0,indexSum:0,indexCount:0};
+  // ── Chart 1: Deliverables by League (uses typeFiltered, not league-filtered) ──
+  const byLeague = ["Championship","League One","Super League","Expansion"].map(l=>({
+    label:l, value:typeFiltered.filter(e=>e.league===l).length, color:LEAGUE_COLORS[l],
+  })).filter(d=>d.value>0);
+
+  // ── Chart 2: Engagement by Vertical (dept) — respects league filter ──
+  const deptCounts = {};
+  leagueFiltered.forEach(e=>{
+    const key=e.dept||"General";
+    deptCounts[key]=(deptCounts[key]||0)+1;
+  });
+  const byDept = Object.entries(deptCounts)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([dept,count])=>({label:dept,value:count,color:DEPT_COLORS[dept]||"#475569",pct:leagueFiltered.length?count/leagueFiltered.length:0}));
+
+  // ── Chart 3: Usage by League (pie) ──
+  const usageByLeague = ["Championship","League One","Super League","Expansion"].map(l=>({
+    label:l, value:typeFiltered.filter(e=>e.league===l).length, color:LEAGUE_COLORS[l],
+  })).filter(d=>d.value>0);
+
+  // ── Top Clubs ────────────────────────────────────────────────────────────
+  const clubMap={};
+  externalLog.forEach(e=>{
+    const c=e.club||"Unknown";
+    if(!clubMap[c])clubMap[c]={club:c,league:e.league||"",count:0,value:0,indexSum:0,indexCount:0};
     clubMap[c].count++;
-    clubMap[c].value+=e.rate||0;
-    if (!e.recurring) { clubMap[c].indexSum+=Number(e.index_score||1); clubMap[c].indexCount++; }
+    const rate=getRackRate(e);
+    clubMap[c].value+=rate;
+    if(!e.recurring){clubMap[c].indexSum+=Number(e.index_score||1);clubMap[c].indexCount++;}
   });
-  Object.values(clubMap).forEach(c=>{ c.indexAvg=c.indexCount>0?c.indexSum/c.indexCount:0; });
-  const clubRows = Object.values(clubMap).sort((a,b)=>
-    clubMetric==="count"?b.count-a.count:clubMetric==="value"?b.value-a.value:b.indexAvg-a.indexAvg
+  Object.values(clubMap).forEach(c=>{c.indexAvg=c.indexCount>0?c.indexSum/c.indexCount:0;});
+  const clubRows=Object.values(clubMap).sort((a,b)=>
+    clubMetric==="value"?b.value-a.value:b.indexAvg-a.indexAvg
   );
-  const top5 = clubRows.slice(0,5);
-  const maxClubMetric = Math.max(...clubRows.map(c=>clubMetric==="count"?c.count:clubMetric==="value"?c.value:c.indexAvg),1);
+  const displayClubs=showAllClubs?clubRows:clubRows.slice(0,10);
+  const maxClub=Math.max(...clubRows.map(c=>clubMetric==="value"?c.value:c.indexAvg),1);
 
-  // ── Dept breakdown ──────────────────────────────────────────────────────────
-  const deptData = ALL_DEPT_NAMES.map(dept => {
-    const en = filtered.filter(e=>e.dept===dept);
-    const strat = en.filter(e=>!e.recurring).length;
-    const rec   = en.filter(e=>e.recurring).length;
-    return { dept, count:en.length, strat, rec,
-      value:en.reduce((s,e)=>s+e.rate,0),
-      ext:en.filter(e=>e.type==="External").length,
-      int:en.filter(e=>e.type==="Internal").length };
-  }).filter(d=>d.count>0).sort((a,b)=>
-    deptMetric==="strategic"?b.strat-a.strat:deptMetric==="recurring"?b.rec-a.rec:b.count-a.count
-  );
-  const maxDept = Math.max(...deptData.map(d=>deptMetric==="strategic"?d.strat:deptMetric==="recurring"?d.rec:d.count),1);
-
-  // ── Int vs Ext per dept ─────────────────────────────────────────────────────
-  const intExtData = ALL_DEPT_NAMES.map(dept => {
-    const en = filtered.filter(e=>e.dept===dept);
-    return { dept, ext:en.filter(e=>e.type==="External").length, int:en.filter(e=>e.type==="Internal").length, total:en.length };
-  }).filter(d=>d.total>0);
-
-  const filterBtn = (active, onClick, label) => (
-    <button onClick={onClick} style={{
-      padding:"6px 14px", border:`1.5px solid ${active?"#0F172A":"#E5E7EB"}`,
-      borderRadius:8, fontFamily:"'DM Sans',sans-serif", fontWeight:active?700:500,
-      fontSize:12, cursor:"pointer",
-      background:active?"#0F172A":"#fff", color:active?"#fff":"#374151",
-      transition:"all .15s",
-    }}>{label}</button>
-  );
-
-  const metricBtn = (val, cur, set, label, color="#4338CA") => (
-    <button onClick={()=>set(val)} style={{
-      padding:"5px 12px", border:`1.5px solid ${cur===val?color:"#E5E7EB"}`,
-      borderRadius:6, fontFamily:"'DM Sans',sans-serif", fontWeight:cur===val?700:400,
-      fontSize:11, cursor:"pointer",
-      background:cur===val?color+"18":"#fff", color:cur===val?color:"#6B7280",
-    }}>{label}</button>
-  );
-
-  if (!log.length) return (
-    <div style={{textAlign:"center",padding:"60px 0",color:"#9CA3AF",fontFamily:"'DM Sans',sans-serif"}}>
+  if(!log.length) return(
+    <div style={{textAlign:"center",padding:"80px 0",fontFamily:"'DM Sans',sans-serif",color:"#9CA3AF"}}>
       No entries yet — go to a department tab and click LOG IT to get started.
     </div>
   );
 
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:24}}>
+  const Pill=({active,onClick,label,color="#0F172A"})=>(
+    <button onClick={onClick} style={{padding:"6px 14px",border:`1.5px solid ${active?color:"#E5E7EB"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:active?700:500,fontSize:12,cursor:"pointer",background:active?color:"#fff",color:active?"#fff":"#374151",transition:"all .15s",whiteSpace:"nowrap"}}>
+      {label}
+    </button>
+  );
 
-      {/* ── SHARED FILTER BAR ─────────────────────────────────────────────── */}
-      <div style={{background:"#fff",border:"1px solid #E5E7EB",borderRadius:14,padding:"16px 20px",boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
-        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-          {/* League */}
-          <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-            <span style={{fontSize:11,fontWeight:700,color:"#9CA3AF",letterSpacing:.5,marginRight:2}}>LEAGUE</span>
-            {LEAGUES.map(l=>filterBtn(league===l,()=>setLeague(l),l==="all"?"All":l))}
+  const Card=({children,title,action})=>(
+    <div style={{background:"#fff",border:"1px solid #E5E7EB",borderRadius:16,padding:"24px 28px",boxShadow:"0 1px 6px rgba(0,0,0,.05)"}}>
+      {(title||action)&&(
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,flexWrap:"wrap",gap:12}}>
+          {title&&<div style={{fontFamily:"'DM Serif Display',serif",fontSize:18,color:"#111827"}}>{title}</div>}
+          {action}
+        </div>
+      )}
+      {children}
+    </div>
+  );
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:20}}>
+
+      {/* ── FILTER BAR ──────────────────────────────────────────────────── */}
+      <div style={{background:"#0F172A",borderRadius:16,padding:"18px 24px 14px",boxShadow:"0 4px 24px rgba(0,0,0,.15)"}}>
+
+        {/* Row 1: League + Type + Export */}
+        <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",marginBottom:14}}>
+          <span style={{fontSize:10,fontWeight:700,letterSpacing:1,color:"#475569",width:52,flexShrink:0}}>LEAGUE</span>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",flex:1}}>
+            {LEAGUES.map(l=>(
+              <button key={l} onClick={()=>setLeague(l)} style={{padding:"7px 16px",border:`1.5px solid ${league===l?(LEAGUE_COLORS[l]||"#6366F1"):"#1E293B"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:league===l?700:400,fontSize:12,cursor:"pointer",background:league===l?"#fff":"#0F172A",color:league===l?"#0F172A":"#64748B",transition:"all .15s",whiteSpace:"nowrap"}}>
+                {l==="all"?"All Leagues":l}
+              </button>
+            ))}
           </div>
+          <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
+            {[["all","All"],["strategic","Strategic"],["recurring","Recurring"]].map(([v,l])=>(
+              <button key={v} onClick={()=>setEntryType(v)} style={{padding:"7px 14px",border:`1.5px solid ${entryType===v?"#6366F1":"#1E293B"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:entryType===v?700:400,fontSize:12,cursor:"pointer",background:entryType===v?"#6366F1":"#0F172A",color:entryType===v?"#fff":"#64748B",transition:"all .15s"}}>
+                {l}
+              </button>
+            ))}
+            <div style={{width:1,height:20,background:"#1E293B",margin:"0 4px"}}/>
+            <span style={{fontSize:12,color:"#475569",whiteSpace:"nowrap"}}>
+              <span style={{color:"#fff",fontWeight:700}}>{total.toLocaleString()}</span> entries
+            </span>
+            <button onClick={onExport} style={{background:"#1E293B",color:"#64748B",border:"1px solid #334155",borderRadius:8,padding:"7px 14px",fontFamily:"'DM Sans',sans-serif",fontWeight:600,fontSize:12,cursor:"pointer",whiteSpace:"nowrap"}}>
+              ⬇ Export
+            </button>
+          </div>
+        </div>
 
-          <div style={{width:1,height:24,background:"#E5E7EB",flexShrink:0,margin:"0 4px"}}/>
+        {/* Row 2: Tiered time slicer */}
+        <div style={{borderTop:"1px solid #1E293B",paddingTop:12}}>
+          <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+            <span style={{fontSize:10,fontWeight:700,letterSpacing:1,color:"#475569",width:52,flexShrink:0}}>PERIOD</span>
+            <div style={{display:"flex",gap:6}}>
+              {[["all","All Time"],["year","Year"],["quarter","Quarter"],["month","Month"]].map(([v,l])=>(
+                <button key={v} onClick={()=>{setTimeGrain(v);setTimeValue(null);}} style={{padding:"6px 14px",border:`1.5px solid ${timeGrain===v?"#22C55E":"#1E293B"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:timeGrain===v?700:400,fontSize:12,cursor:"pointer",background:timeGrain===v?"#22C55E":"#0F172A",color:timeGrain===v?"#fff":"#64748B",transition:"all .15s"}}>
+                  {l}
+                </button>
+              ))}
+            </div>
 
-          {/* Period */}
-          <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-            <span style={{fontSize:11,fontWeight:700,color:"#9CA3AF",letterSpacing:.5,marginRight:2}}>PERIOD</span>
-            {[["all","All Time"],["year","This Year"],["quarter","This Quarter"],["month","This Month"]].map(([v,l])=>
-              filterBtn(period===v,()=>setPeriod(v),l)
+            {/* Year options */}
+            {timeGrain==="year" && (
+              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                {availableYears.map(y=>(
+                  <button key={y} onClick={()=>setTimeValue(y)} style={{padding:"6px 14px",border:`1.5px solid ${timeValue===y?"#fff":"#334155"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:timeValue===y?700:400,fontSize:12,cursor:"pointer",background:timeValue===y?"#fff":"transparent",color:timeValue===y?"#0F172A":"#94A3B8",transition:"all .15s"}}>
+                    {y}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Quarter options */}
+            {timeGrain==="quarter" && (
+              <div style={{display:"flex",gap:4}}>
+                {QUARTERS.map((q,i)=>(
+                  <button key={q} onClick={()=>setTimeValue(i)} style={{padding:"6px 14px",border:`1.5px solid ${timeValue===i?"#fff":"#334155"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:timeValue===i?700:400,fontSize:12,cursor:"pointer",background:timeValue===i?"#fff":"transparent",color:timeValue===i?"#0F172A":"#94A3B8",transition:"all .15s"}}>
+                    {q}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Month options */}
+            {timeGrain==="month" && (
+              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                {MONTHS.map((m,i)=>(
+                  <button key={m} onClick={()=>setTimeValue(i)} style={{padding:"6px 12px",border:`1.5px solid ${timeValue===i?"#fff":"#334155"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:timeValue===i?700:400,fontSize:12,cursor:"pointer",background:timeValue===i?"#fff":"transparent",color:timeValue===i?"#0F172A":"#94A3B8",transition:"all .15s"}}>
+                    {m}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {(timeGrain!=="all"&&timeValue!==null)&&(
+              <span style={{fontSize:11,color:"#22C55E",fontFamily:"'DM Sans',sans-serif",marginLeft:4}}>
+                ● {timeGrain==="year"?timeValue:timeGrain==="quarter"?`Q${timeValue+1} ${new Date().getFullYear()}`:MONTHS[timeValue]}
+              </span>
             )}
           </div>
-
-          <div style={{width:1,height:24,background:"#E5E7EB",flexShrink:0,margin:"0 4px"}}/>
-
-          {/* Type */}
-          <div style={{display:"flex",alignItems:"center",gap:6}}>
-            <span style={{fontSize:11,fontWeight:700,color:"#9CA3AF",letterSpacing:.5,marginRight:2}}>TYPE</span>
-            {[["all","All"],["strategic","Strategic"],["recurring","Recurring"]].map(([v,l])=>
-              filterBtn(entryType===v,()=>setEntryType(v),l)
-            )}
-          </div>
-
-          <span style={{marginLeft:"auto",fontSize:12,color:"#6B7280",fontFamily:"'DM Sans',sans-serif",whiteSpace:"nowrap"}}>
-            <strong>{filtered.length}</strong> entries
-          </span>
-          <button onClick={onExport} style={{background:"#F1F5F9",color:"#475569",border:"1px solid #E5E7EB",borderRadius:8,padding:"6px 14px",fontFamily:"'DM Sans',sans-serif",fontWeight:600,fontSize:12,cursor:"pointer",whiteSpace:"nowrap"}}>⬇ Export</button>
         </div>
       </div>
 
-      {/* ── HEADLINE STATS ─────────────────────────────────────────────────── */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}>
+      {/* ── HEADLINE KPIS ───────────────────────────────────────────────── */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12}}>
         {[
-          {label:"TOTAL DELIVERABLES", value:totalCount, color:"#111827", sub:`${extCnt} ext · ${intCnt} int`},
-          {label:"STRATEGIC", value:strategicCnt, color:"#4338CA", sub:`${totalCount?Math.round(strategicCnt/totalCount*100):0}% of total`},
-          {label:"RECURRING", value:recurringCnt, color:"#854D0E", sub:`${totalCount?Math.round(recurringCnt/totalCount*100):0}% of total`},
-          {label:"AVG CPG INDEX", value:avgIndex, color:"#047857", sub:"strategic external only"},
-          {label:"CLUBS ENGAGED", value:Object.keys(clubMap).length, color:"#0369A1", sub:league==="all"?"all leagues":league},
+          {label:"TOTAL DELIVERABLES",value:total.toLocaleString(),color:"#111827",sub:`${extCnt} external · ${intCnt} internal`},
+          {label:"STRATEGIC",value:strategic.toLocaleString(),color:"#4338CA",sub:`${total?Math.round(strategic/total*100):0}% of total`},
+          {label:"RECURRING",value:recurring.toLocaleString(),color:"#854D0E",sub:`${total?Math.round(recurring/total*100):0}% of total`},
+          {label:"AVG CPG INDEX",value:avgIndex,color:"#047857",sub:"strategic external"},
+          {label:"CLUBS ENGAGED",value:Object.keys(clubMap).length.toLocaleString(),color:"#0369A1",sub:league==="all"?"all leagues":league},
         ].map(({label,value,color,sub})=>(
-          <div key={label} style={{background:"#fff",borderRadius:12,padding:"16px 20px",border:"1px solid #E5E7EB",boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
+          <div key={label} style={{background:"#fff",borderRadius:12,padding:"16px 20px",border:"1px solid #E5E7EB",boxShadow:"0 1px 4px rgba(0,0,0,.04)"}}>
             <div style={{fontSize:10,fontWeight:700,letterSpacing:1,color:"#9CA3AF",marginBottom:6}}>{label}</div>
             <div style={{fontSize:26,fontWeight:800,color,fontFamily:"'DM Serif Display',serif",lineHeight:1}}>{value}</div>
             <div style={{fontSize:11,color:"#6B7280",marginTop:4}}>{sub}</div>
@@ -818,162 +1140,148 @@ function Dashboard({ log, onExport, clubsByLeague }) {
         ))}
       </div>
 
-      {/* ── TOP 5 CLUBS ───────────────────────────────────────────────────── */}
-      <div style={{background:"#fff",border:"1px solid #E5E7EB",borderRadius:14,padding:"20px 24px",boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:10}}>
-          <div style={{fontFamily:"'DM Serif Display',serif",fontSize:17,color:"#111827"}}>
-            Top Clubs {league!=="all"?`— ${league}`:""}
-          </div>
-          <div style={{display:"flex",gap:6}}>
-            {metricBtn("index",clubMetric,setClubMetric,"CPG Index")}
-            {metricBtn("count",clubMetric,setClubMetric,"Usage")}
-            {metricBtn("value",clubMetric,setClubMetric,"Value")}
-          </div>
-        </div>
+      {/* ── ROW 1: BAR CHART + LEAGUE PIE ──────────────────────────────── */}
+      <div style={{display:"grid",gridTemplateColumns:"1.4fr 1fr",gap:16}}>
 
-        {top5.length===0?(
-          <div style={{textAlign:"center",padding:"24px 0",color:"#9CA3AF",fontSize:13}}>No external entries match this filter.</div>
-        ):(
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {top5.map((c,i)=>{
-              const ls=LEAGUE_STYLES[c.league]||LEAGUE_STYLES["League-wide"];
-              const metricVal=clubMetric==="count"?c.count:clubMetric==="value"?c.value:c.indexAvg;
-              const metricLabel=clubMetric==="value"?fmt$(c.value):clubMetric==="count"?`${c.count} logged`:c.indexAvg.toFixed(2);
-              const pct=metricVal/maxClubMetric*100;
-              return(
-                <div key={c.club} style={{display:"flex",alignItems:"center",gap:12}}>
-                  <div style={{width:20,textAlign:"right",fontSize:12,fontWeight:700,color:"#9CA3AF",flexShrink:0}}>#{i+1}</div>
-                  <div style={{width:190,flexShrink:0}}>
-                    <div style={{fontSize:13,fontWeight:700,color:"#111827",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{c.club}</div>
-                    <div style={{marginTop:2}}><LeagueBadge league={c.league}/></div>
-                  </div>
-                  <div style={{flex:1,height:28,background:"#F3F4F6",borderRadius:8,overflow:"hidden"}}>
-                    <div style={{width:`${pct}%`,height:"100%",background:ls.color,borderRadius:8,opacity:.85,transition:"width .4s"}}/>
-                  </div>
-                  <div style={{width:90,textAlign:"right",flexShrink:0}}>
-                    <div style={{fontSize:14,fontWeight:800,color:ls.color,fontFamily:"'DM Serif Display',serif"}}>{metricLabel}</div>
-                    {clubMetric!=="count"&&<div style={{fontSize:10,color:"#9CA3AF"}}>{c.count} logged</div>}
-                    {clubMetric!=="index"&&c.indexAvg>0&&<div style={{fontSize:10,color:"#9CA3AF"}}>idx {c.indexAvg.toFixed(1)}</div>}
-                  </div>
-                </div>
-              );
-            })}
+        {/* Deliverables by League — bar */}
+        <Card title="Total Deliverables by League">
+          {byLeague.length>0
+            ?<HBarChart data={byLeague} color="#1D4ED8" height={52}/>
+            :<div style={{textAlign:"center",padding:"32px 0",color:"#9CA3AF",fontSize:13}}>No data for this filter.</div>
+          }
+        </Card>
 
-            {/* Show all clubs below top 5 as a compact ranked list */}
-            {clubRows.length>5&&(
-              <div style={{marginTop:8,paddingTop:12,borderTop:"1px solid #F3F4F6"}}>
-                <div style={{fontSize:11,fontWeight:700,color:"#9CA3AF",letterSpacing:.5,marginBottom:8}}>ALL CLUBS ({clubRows.length})</div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:4}}>
-                  {clubRows.slice(5).map((c,i)=>{
-                    const ls=LEAGUE_STYLES[c.league]||LEAGUE_STYLES["League-wide"];
-                    const metricLabel=clubMetric==="value"?fmt$(c.value):clubMetric==="count"?`${c.count}×`:c.indexAvg.toFixed(1);
-                    return(
-                      <div key={c.club} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 8px",borderRadius:6,background:"#F8FAFC"}}>
-                        <span style={{fontSize:10,color:"#9CA3AF",width:22,textAlign:"right",flexShrink:0}}>#{i+6}</span>
-                        <span style={{fontSize:12,color:"#374151",flex:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{c.club}</span>
-                        <span style={{fontSize:12,fontWeight:700,color:ls.color,flexShrink:0}}>{metricLabel}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+        {/* CPG Usage by League — donut */}
+        <Card title="CPG Usage by League">
+          {usageByLeague.length>0
+            ?<DonutChart slices={usageByLeague} size={200} title={`${total}`} subtitle="total"/>
+            :<div style={{textAlign:"center",padding:"32px 0",color:"#9CA3AF",fontSize:13}}>No data.</div>
+          }
+        </Card>
+      </div>
+
+      {/* ── ROW 2: VERTICAL PIE ─────────────────────────────────────────── */}
+      <Card
+        title={`CPG Engagement by Vertical${league!=="all"?` — ${league}`:""}`}
+        action={
+          league!=="all"&&(
+            <span style={{fontSize:12,color:"#6B7280",fontFamily:"'DM Sans',sans-serif"}}>
+              Filtered to <strong>{league}</strong> clubs only
+            </span>
+          )
+        }
+      >
+        {byDept.length>0
+          ?<DonutChart slices={byDept.map(d=>({...d,label:d.label}))} size={220} title={`${leagueFiltered.length}`} subtitle="deliverables"/>
+          :<div style={{textAlign:"center",padding:"32px 0",color:"#9CA3AF",fontSize:13}}>No data for this filter.</div>
+        }
+      </Card>
+
+      {/* ── ROW 3: TOP CLUBS ────────────────────────────────────────────── */}
+      <Card
+        title={`Top Clubs by ${clubMetric==="value"?"Estimated Rack Rate Value":"CPG Index Score"}`}
+        action={
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <div style={{display:"flex",background:"#F1F5F9",borderRadius:8,padding:3,gap:2}}>
+              {[["index","CPG Index"],["value","Est. Value"]].map(([v,l])=>(
+                <button key={v} onClick={()=>setClubMetric(v)} style={{padding:"5px 12px",border:"none",borderRadius:6,fontFamily:"'DM Sans',sans-serif",fontWeight:clubMetric===v?700:400,fontSize:12,cursor:"pointer",background:clubMetric===v?"#0F172A":"transparent",color:clubMetric===v?"#fff":"#6B7280",transition:"all .15s"}}>{l}</button>
+              ))}
+            </div>
+            {clubMetric==="value"&&(
+              <span style={{fontSize:11,color:"#F59E0B",background:"#FEF9C3",border:"1px solid #FDE68A",borderRadius:6,padding:"2px 8px",fontWeight:600}}>Est. rates</span>
             )}
           </div>
-        )}
-      </div>
-
-      {/* ── CPG USAGE BY DEPARTMENT ────────────────────────────────────────── */}
-      <div style={{background:"#fff",border:"1px solid #E5E7EB",borderRadius:14,padding:"20px 24px",boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:10}}>
-          <div style={{fontFamily:"'DM Serif Display',serif",fontSize:17,color:"#111827"}}>CPG Usage by Department</div>
-          <div style={{display:"flex",gap:6}}>
-            {metricBtn("count",deptMetric,setDeptMetric,"Total","#0369A1")}
-            {metricBtn("strategic",deptMetric,setDeptMetric,"Strategic","#4338CA")}
-            {metricBtn("recurring",deptMetric,setDeptMetric,"Recurring","#854D0E")}
-          </div>
-        </div>
-
-        {deptData.length===0?(
-          <div style={{textAlign:"center",padding:"24px 0",color:"#9CA3AF",fontSize:13}}>No entries match this filter.</div>
+        }
+      >
+        {clubRows.length===0?(
+          <div style={{textAlign:"center",padding:"32px 0",color:"#9CA3AF",fontSize:13}}>No external entries for this filter.</div>
         ):(
-          <div style={{display:"flex",flexDirection:"column",gap:12}}>
-            {deptData.map(d=>{
-              const cfg=DEPT_CONFIG[d.dept];
-              const barVal=deptMetric==="strategic"?d.strat:deptMetric==="recurring"?d.rec:d.count;
-              const pct=barVal/maxDept*100;
-              return(
-                <div key={d.dept}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:5}}>
-                    <span style={{fontSize:13,fontWeight:700,color:"#111827",width:180,flexShrink:0}}>{cfg.emoji} {d.dept}</span>
-                    <div style={{flex:1,height:28,background:"#F3F4F6",borderRadius:8,overflow:"hidden",position:"relative"}}>
-                      <div style={{width:`${pct}%`,height:"100%",background:cfg.color,borderRadius:8,opacity:.85,transition:"width .4s"}}/>
+          <>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {displayClubs.map((c,i)=>{
+                const ls=LEAGUE_STYLES[c.league]||LEAGUE_STYLES["League-wide"];
+                const metricVal=clubMetric==="value"?c.value:c.indexAvg;
+                const metricLabel=clubMetric==="value"?"$"+Math.round(c.value).toLocaleString():c.indexAvg.toFixed(2);
+                const pct=metricVal/maxClub*100;
+                return(
+                  <div key={c.club} style={{display:"flex",alignItems:"center",gap:10}}>
+                    <span style={{width:24,textAlign:"right",fontSize:12,fontWeight:700,color:"#9CA3AF",flexShrink:0}}>#{i+1}</span>
+                    <div style={{width:190,flexShrink:0}}>
+                      <div style={{fontSize:13,fontWeight:700,color:"#111827",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{c.club}</div>
+                      <LeagueBadge league={c.league||"Unknown"}/>
                     </div>
-                    <div style={{width:100,textAlign:"right",flexShrink:0}}>
-                      <span style={{fontSize:14,fontWeight:800,color:cfg.color,fontFamily:"'DM Serif Display',serif"}}>{barVal}</span>
-                      <span style={{fontSize:11,color:"#9CA3AF",marginLeft:4}}>{deptMetric==="count"?"total":deptMetric}</span>
+                    <div style={{flex:1,height:28,background:"#F3F4F6",borderRadius:6,overflow:"hidden"}}>
+                      <div style={{width:`${pct}%`,height:"100%",background:ls.color,borderRadius:6,opacity:.85,transition:"width .4s"}}/>
+                    </div>
+                    <div style={{width:110,textAlign:"right",flexShrink:0}}>
+                      <div style={{fontSize:15,fontWeight:800,color:ls.color,fontFamily:"'DM Serif Display',serif"}}>{metricLabel}</div>
+                      <div style={{fontSize:10,color:"#9CA3AF"}}>{c.count} logged{clubMetric==="value"?` · idx ${c.indexAvg.toFixed(1)}`:""}</div>
                     </div>
                   </div>
-                  {/* Mini breakdown pills */}
-                  <div style={{display:"flex",gap:6,paddingLeft:190}}>
-                    <span style={{fontSize:10,background:"#EEF2FF",color:"#4338CA",borderRadius:4,padding:"1px 7px",fontWeight:600}}>{d.strat} strategic</span>
-                    <span style={{fontSize:10,background:"#FEF9C3",color:"#854D0E",borderRadius:4,padding:"1px 7px",fontWeight:600}}>{d.rec} recurring</span>
-                    <span style={{fontSize:10,background:"#EFF6FF",color:"#1D4ED8",borderRadius:4,padding:"1px 7px",fontWeight:600}}>{d.ext} ext</span>
-                    <span style={{fontSize:10,background:"#F0FDF4",color:"#047857",borderRadius:4,padding:"1px 7px",fontWeight:600}}>{d.int} int</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+            {clubRows.length>10&&(
+              <button onClick={()=>setShowAllClubs(!showAllClubs)}
+                style={{marginTop:16,width:"100%",background:"#F8FAFC",border:"1px solid #E5E7EB",borderRadius:8,padding:"9px",fontFamily:"'DM Sans',sans-serif",fontWeight:600,fontSize:13,color:"#374151",cursor:"pointer"}}>
+                {showAllClubs?`Show Top 10 ▲`:`Show All ${clubRows.length} Clubs ▼`}
+              </button>
+            )}
+          </>
         )}
-      </div>
+      </Card>
 
-      {/* ── INTERNAL VS EXTERNAL WORKLOAD ─────────────────────────────────── */}
-      <div style={{background:"#fff",border:"1px solid #E5E7EB",borderRadius:14,padding:"20px 24px",boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
-        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:17,color:"#111827",marginBottom:16}}>Internal vs. External Workload</div>
+      {/* ── ROW 4: INT VS EXT WORKLOAD ──────────────────────────────────── */}
+      <Card title="Internal vs. External Workload by Department">
+        {(() => {
+          const deptIntExt = ALL_DEPT_NAMES.map(dept=>{
+            const en=typeFiltered.filter(e=>e.dept===dept);
+            return{dept,ext:en.filter(e=>e.type==="External").length,int:en.filter(e=>e.type==="Internal").length,total:en.length};
+          }).filter(d=>d.total>0);
 
-        {/* Overall split */}
-        <div style={{marginBottom:20}}>
-          <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-            <span style={{fontSize:13,color:"#6B7280",fontFamily:"'DM Sans',sans-serif"}}>Overall split across all departments</span>
-            <span style={{fontSize:13,fontFamily:"'DM Sans',sans-serif"}}>
-              <span style={{color:"#0369A1",fontWeight:700}}>{extCnt} external</span>
-              <span style={{color:"#9CA3AF",margin:"0 6px"}}>·</span>
-              <span style={{color:"#047857",fontWeight:700}}>{intCnt} internal</span>
-            </span>
-          </div>
-          <div style={{display:"flex",height:12,borderRadius:99,overflow:"hidden",background:"#F3F4F6"}}>
-            {extCnt>0&&<div style={{width:`${(extCnt/(extCnt+intCnt))*100}%`,background:"#0369A1",transition:"width .3s"}}/>}
-            {intCnt>0&&<div style={{width:`${(intCnt/(extCnt+intCnt))*100}%`,background:"#047857",transition:"width .3s"}}/>}
-          </div>
-          <div style={{display:"flex",justifyContent:"space-between",marginTop:4}}>
-            <span style={{fontSize:11,color:"#0369A1"}}>{totalCount?Math.round(extCnt/totalCount*100):0}% external</span>
-            <span style={{fontSize:11,color:"#047857"}}>{totalCount?Math.round(intCnt/totalCount*100):0}% internal</span>
-          </div>
-        </div>
+          if(!deptIntExt.length) return <div style={{textAlign:"center",padding:"24px 0",color:"#9CA3AF",fontSize:13}}>No data.</div>;
 
-        {/* Per dept */}
-        {intExtData.map(({dept,ext,int:intN,total:tot})=>{
-          const cfg=DEPT_CONFIG[dept];
-          const extPct=tot?ext/tot:0, intPct=tot?intN/tot:0;
           return(
-            <div key={dept} style={{marginBottom:12}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                <span style={{fontSize:12,fontWeight:600,color:"#374151"}}>{cfg.emoji} {dept}</span>
-                <span style={{fontSize:11,color:"#9CA3AF"}}>{tot} total</span>
+            <div>
+              {/* Overall */}
+              <div style={{marginBottom:20,padding:"12px 16px",background:"#F8FAFC",borderRadius:10}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                  <span style={{fontSize:12,color:"#6B7280",fontFamily:"'DM Sans',sans-serif"}}>Overall</span>
+                  <span style={{fontSize:12,fontFamily:"'DM Sans',sans-serif"}}>
+                    <span style={{color:"#0369A1",fontWeight:700}}>{extCnt} ext</span>
+                    <span style={{color:"#9CA3AF",margin:"0 6px"}}>·</span>
+                    <span style={{color:"#047857",fontWeight:700}}>{intCnt} int</span>
+                  </span>
+                </div>
+                <div style={{display:"flex",height:10,borderRadius:99,overflow:"hidden",background:"#E5E7EB"}}>
+                  {extCnt>0&&<div style={{width:`${total?(extCnt/total)*100:0}%`,background:"#0369A1",transition:"width .3s"}}/>}
+                  {intCnt>0&&<div style={{width:`${total?(intCnt/total)*100:0}%`,background:"#047857",transition:"width .3s"}}/>}
+                </div>
               </div>
-              <div style={{display:"flex",height:8,borderRadius:99,overflow:"hidden",background:"#F3F4F6"}}>
-                {ext>0&&<div style={{width:`${extPct*100}%`,background:"#0369A1"}}/>}
-                {intN>0&&<div style={{width:`${intPct*100}%`,background:"#047857"}}/>}
+              {/* Per dept */}
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                {deptIntExt.map(({dept,ext,int:intN,total:tot})=>{
+                  const cfg=DEPT_CONFIG[dept];
+                  return(
+                    <div key={dept} style={{display:"flex",alignItems:"center",gap:12}}>
+                      <span style={{width:160,flexShrink:0,fontSize:12,fontWeight:600,color:"#374151",fontFamily:"'DM Sans',sans-serif"}}>{cfg.emoji} {dept}</span>
+                      <div style={{flex:1,height:8,borderRadius:99,overflow:"hidden",background:"#F3F4F6",display:"flex"}}>
+                        {ext>0&&<div style={{width:`${(ext/tot)*100}%`,background:"#0369A1"}}/>}
+                        {intN>0&&<div style={{width:`${(intN/tot)*100}%`,background:"#047857"}}/>}
+                      </div>
+                      <span style={{width:80,flexShrink:0,fontSize:11,color:"#9CA3AF",fontFamily:"'DM Sans',sans-serif",textAlign:"right"}}>{ext} ext · {intN} int</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{display:"flex",gap:16,marginTop:14,paddingTop:12,borderTop:"1px solid #F3F4F6"}}>
+                <div style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:10,height:10,borderRadius:"50%",background:"#0369A1"}}/><span style={{fontSize:11,color:"#6B7280"}}>External — club-facing</span></div>
+                <div style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:10,height:10,borderRadius:"50%",background:"#047857"}}/><span style={{fontSize:11,color:"#6B7280"}}>Internal — USL-facing</span></div>
               </div>
             </div>
           );
-        })}
-
-        <div style={{display:"flex",gap:16,marginTop:12,paddingTop:12,borderTop:"1px solid #F3F4F6"}}>
-          <div style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:10,height:10,borderRadius:"50%",background:"#0369A1"}}/><span style={{fontSize:11,color:"#6B7280"}}>External — club-facing work</span></div>
-          <div style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:10,height:10,borderRadius:"50%",background:"#047857"}}/><span style={{fontSize:11,color:"#6B7280"}}>Internal — USL-facing work</span></div>
-        </div>
-      </div>
+        })()}
+      </Card>
 
     </div>
   );
@@ -1234,11 +1542,85 @@ function exportView(view,data) {
 //  ROOT APP
 // ─────────────────────────────────────────────────────────────────────────────
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  APP NAV — LEFT SIDEBAR
+// ─────────────────────────────────────────────────────────────────────────────
+
+const NAV_ITEMS = [
+  { id:"Dashboard",          label:"Dashboard",          emoji:"",    group:"main" },
+  { id:"Activity Explorer",  label:"Activity Explorer",  emoji:"",    group:"main" },
+  { id:"Corp Partnerships",  label:"Corp Partnerships",  emoji:"🤝",  group:"dept" },
+  { id:"Marketing",          label:"Marketing",          emoji:"📣",  group:"dept" },
+  { id:"Consumer Products",  label:"Consumer Products",  emoji:"🛍️",  group:"dept" },
+  { id:"Ticketing",          label:"Ticketing",          emoji:"🎟️",  group:"dept" },
+  { id:"Youth / Facilities", label:"Youth / Facilities", emoji:"⚽",  group:"dept" },
+  { id:"League Initiatives", label:"League Initiatives", emoji:"🏛️",  group:"dept" },
+];
+
+function AppNav({ activeTab, setActiveTab, loading }) {
+  return (
+    <div style={{width:220,flexShrink:0,background:"#0F172A",minHeight:"100vh",display:"flex",flexDirection:"column",position:"sticky",top:0,zIndex:100,borderRight:"1px solid #1E293B"}}>
+
+      {/* Brand */}
+      <div style={{padding:"20px 16px 16px",borderBottom:"1px solid #1E293B"}}>
+        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:20,color:"#fff",letterSpacing:"-.3px",marginBottom:6}}>Dept Tracker</div>
+        <div style={{display:"flex",alignItems:"center",gap:6}}>
+          <div style={{width:6,height:6,borderRadius:"50%",background:loading?"#F59E0B":"#22C55E",boxShadow:loading?"none":"0 0 8px #22C55E66"}}/>
+          <span style={{fontSize:11,color:"#475569",fontFamily:"'DM Sans',sans-serif"}}>{loading?"syncing…":"live"}</span>
+        </div>
+        <div style={{fontSize:10,color:"#334155",fontFamily:"'DM Sans',sans-serif",marginTop:4,letterSpacing:.3}}>USL Club Performance Group</div>
+      </div>
+
+      {/* Nav items */}
+      <div style={{padding:"10px 8px",flex:1,display:"flex",flexDirection:"column",gap:2}}>
+
+        {/* Main views */}
+        {NAV_ITEMS.filter(i=>i.group==="main").map(item=>{
+          const isActive=activeTab===item.id;
+          return(
+            <button key={item.id} onClick={()=>setActiveTab(item.id)}
+              style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"9px 12px",border:"none",borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:isActive?700:400,cursor:"pointer",textAlign:"left",background:isActive?"#fff":"transparent",color:isActive?"#0F172A":"#64748B",transition:"all .15s"}}>
+              <span style={{fontSize:14,opacity:isActive?1:.7}}>{item.emoji||"◈"}</span>
+              {item.label}
+              {isActive&&<div style={{marginLeft:"auto",width:5,height:5,borderRadius:"50%",background:"#0F172A",flexShrink:0}}/>}
+            </button>
+          );
+        })}
+
+        {/* Dept section */}
+        <div style={{margin:"10px 0 4px",padding:"0 12px"}}>
+          <span style={{fontSize:9,fontWeight:700,letterSpacing:1.2,color:"#334155",textTransform:"uppercase"}}>Departments</span>
+        </div>
+
+        {NAV_ITEMS.filter(i=>i.group==="dept").map(item=>{
+          const cfg=DEPT_CONFIG[item.id];
+          const isActive=activeTab===item.id;
+          return(
+            <button key={item.id} onClick={()=>setActiveTab(item.id)}
+              style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"9px 12px",border:"none",borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:isActive?700:400,cursor:"pointer",textAlign:"left",background:isActive?(cfg?.color+"22"||"#ffffff22"):"transparent",color:isActive?(cfg?.color||"#A5B4FC"):"#64748B",transition:"all .15s"}}>
+              <span style={{fontSize:14}}>{item.emoji}</span>
+              <span style={{flex:1,lineHeight:1.2}}>{item.label}</span>
+              {isActive&&<div style={{width:5,height:5,borderRadius:"50%",background:cfg?.color||"#6366F1",flexShrink:0}}/>}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Footer */}
+      <div style={{padding:"12px 16px",borderTop:"1px solid #1E293B"}}>
+        <div style={{fontSize:10,color:"#1E293B",fontFamily:"'DM Sans',sans-serif"}}>v2.0 · {new Date().getFullYear()}</div>
+      </div>
+    </div>
+  );
+}
+
+
 export default function App() {
   const [unlocked,      setUnlocked]      = useState(()=>sessionStorage.getItem("dept_unlocked")==="1");
   const [activeTab,     setActiveTab]     = useState("Dashboard");
   const [log,           setLog]           = useState([]);
-  const [deptItems,     setDeptItems]     = useState({});
+  const [deptItems,     setDeptItems]     = useState(FALLBACK_DEPT_ITEMS);
   const [clubsByLeague, setClubsByLeague] = useState(FALLBACK_CLUBS);
   const [loading,       setLoading]       = useState(true);
   const [toast,         setToast]         = useState(null);
@@ -1251,7 +1633,14 @@ export default function App() {
         dbFetchClubs().catch(()=>[]),
       ]);
       setLog(logData);
-      if(delivData.length) setDeptItems(buildDeptItems(delivData));
+      if(delivData.length) {
+        const built = buildDeptItems(delivData);
+        // Only use sheet data if it actually produced items for known depts
+        const hasItems = ALL_DEPT_NAMES.some(d => built[d]?.external?.length || built[d]?.internal?.length);
+        setDeptItems(hasItems ? built : FALLBACK_DEPT_ITEMS);
+      } else {
+        setDeptItems(FALLBACK_DEPT_ITEMS);
+      }
       if(clubData.length)  setClubsByLeague(buildClubsByLeague(clubData));
     }catch(e){console.error("Load error:",e);}
     finally{setLoading(false);}
@@ -1308,33 +1697,23 @@ export default function App() {
         @keyframes spin{to{transform:rotate(360deg)}}
       `}</style>
 
-      <div style={{background:"#0F172A",padding:"0 24px",display:"flex",alignItems:"center",gap:16,boxShadow:"0 2px 12px rgba(0,0,0,.18)",position:"sticky",top:0,zIndex:100,minHeight:56,flexWrap:"wrap"}}>
-        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:18,color:"#fff",whiteSpace:"nowrap"}}>Dept Tracker</div>
-        <div style={{display:"flex",alignItems:"center",gap:6}}>
-          <div style={{width:7,height:7,borderRadius:"50%",background:loading?"#F59E0B":"#22C55E",boxShadow:loading?"none":"0 0 6px #22C55E"}}/>
-          <span style={{fontSize:11,color:"#64748B"}}>{loading?"syncing…":"live"}</span>
-        </div>
-        <div style={{width:1,height:24,background:"#334155",flexShrink:0}}/>
-        <div style={{display:"flex",gap:4,overflowX:"auto",flex:1}}>
-          {TABS.map(tab=>{
-            const cfg=DEPT_CONFIG[tab],isActive=tab===activeTab;
-            return<button key={tab} onClick={()=>setActiveTab(tab)} style={{background:isActive?(cfg?cfg.color:"#fff"):"transparent",color:isActive?"#fff":"#94A3B8",border:"none",borderRadius:8,padding:"7px 14px",whiteSpace:"nowrap",fontFamily:"'DM Sans',sans-serif",fontWeight:isActive?700:500,fontSize:13,cursor:"pointer",transition:"all .15s"}}>{cfg?`${cfg.emoji} ${tab}`:tab}</button>;
-          })}
+      <div style={{display:"flex",minHeight:"100vh"}}>
+        <AppNav activeTab={activeTab} setActiveTab={setActiveTab} loading={loading}/>
+        <div style={{flex:1,background:"#F8F9FB",minWidth:0}}>
+          {loading?(
+            <div style={{textAlign:"center",padding:"80px 0",fontFamily:"'DM Sans',sans-serif",color:"#6B7280"}}>
+              <div style={{width:32,height:32,border:"3px solid #E5E7EB",borderTopColor:"#6366F1",borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto 16px"}}/>
+              Loading…
+            </div>
+          ):(
+            <div style={{maxWidth:1200,padding:"28px 28px"}}>
+              {activeTab==="Dashboard"         &&<Dashboard log={log} onExport={()=>exportExcel(log)} clubsByLeague={clubsByLeague}/>}
+              {activeTab==="Activity Explorer" &&<ActivityExplorer log={log} onRemove={handleRemove} onExportView={exportView}/>}
+              {ALL_DEPT_NAMES.includes(activeTab)&&<DeptTab dept={activeTab} log={log} onLog={handleLog} onBulkLog={handleBulkLog} onBulkComplete={handleBulkComplete} deptItems={deptItems} clubsByLeague={clubsByLeague}/>}
+            </div>
+          )}
         </div>
       </div>
-
-      {loading?(
-        <div style={{textAlign:"center",padding:"80px 0",fontFamily:"'DM Sans',sans-serif",color:"#6B7280"}}>
-          <div style={{width:32,height:32,border:"3px solid #E5E7EB",borderTopColor:"#6366F1",borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto 16px"}}/>
-          Loading…
-        </div>
-      ):(
-        <div style={{maxWidth:1200,margin:"0 auto",padding:"28px 20px"}}>
-          {activeTab==="Dashboard"         &&<Dashboard log={log} onExport={()=>exportExcel(log)} clubsByLeague={clubsByLeague}/>}
-          {activeTab==="Activity Explorer" &&<ActivityExplorer log={log} onRemove={handleRemove} onExportView={exportView}/>}
-          {ALL_DEPT_NAMES.includes(activeTab)&&<DeptTab dept={activeTab} log={log} onLog={handleLog} onBulkLog={handleBulkLog} onBulkComplete={handleBulkComplete} deptItems={deptItems} clubsByLeague={clubsByLeague}/>}
-        </div>
-      )}
 
       {toast&&<Toast msg={toast.msg} color={toast.color} onDone={()=>setToast(null)}/>}
     </>
