@@ -625,20 +625,20 @@ function DeptTab({ dept, log, onLog, onBulkLog, onBulkComplete, deptItems, clubs
 
   const handleLogClick=idx=>{if(!staffName){setNameErr(true);return;}setNameErr(false);setModal(idx);};
 
-  const handleConfirm=async entries=>{
+  const handleConfirm=async (entries, notes="")=>{
     const item=items[modal];
     setModal(null);setPulsingIdx(modal);setTimeout(()=>setPulsingIdx(null),400);
     const total=entries.length;
     if(total===1){
       const{club,league}=entries[0];
-      await onLog({dept,name:item.name,rate:item.rate,type:activeMode==="internal"?"Internal":"External",cat:item.cat,index_score:item.index_score||1,recurring:item.recurring||false,staff:staffName,club,league,bulkSilent:false});
+      await onLog({dept,name:item.name,rate:item.rate,type:activeMode==="internal"?"Internal":"External",cat:item.cat,index_score:item.index_score||1,recurring:item.recurring||false,staff:staffName,club,league,notes,bulkSilent:false});
     } else {
       // Build all entries first, add to UI optimistically, then send as one batch request
       const newEntries = entries.map(({club,league})=>({
         dept,name:item.name,rate:item.rate,
         type:activeMode==="internal"?"Internal":"External",
         cat:item.cat,index_score:item.index_score||1,
-        recurring:item.recurring||false,staff:staffName,club,league,
+        recurring:item.recurring||false,staff:staffName,club,league,notes,
         id:`${Date.now()}-${Math.random().toString(36).slice(2)}`,
         ts:Date.now(),
       }));
