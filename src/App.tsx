@@ -938,108 +938,76 @@ function DonutChart({ slices, size=220, title, subtitle }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function Dashboard({ log, onExport, clubsByLeague }) {
-  const [league,      setLeague]      = useState("all");
-  const [entryType,   setEntryType]   = useState("all");
-  const [metric,      setMetric]      = useState("index"); // "index" | "value"
-  const [showAllClubs,setShowAllClubs]= useState(false);
-
-  // Combined year + month time picker
-  const [filterYear,  setFilterYear]  = useState("all");
-  const [filterMonth, setFilterMonth] = useState("all");
+  const [league,       setLeague]      = useState("all");
+  const [filterYear,   setFilterYear]  = useState("all");
+  const [filterMonth,  setFilterMonth] = useState("all");
+  const [entryType,    setEntryType]   = useState("all");
+  const [metric,       setMetric]      = useState("index");
+  const [showAllClubs, setShowAllClubs]= useState(false);
 
   const LEAGUES = ["all","Championship","League One","Super League","Expansion"];
-  const LEAGUE_COLORS = {
-    "Championship":"#1D4ED8","League One":"#047857",
-    "Super League":"#7C3AED","Expansion":"#B45309","all":"#011e5c",
-  };
-
-  const availableYears = [...new Set(log.map(e=>new Date(e.ts).getFullYear()))].sort((a,b)=>b-a);
+  const LEAGUE_COLORS = {"Championship":"#1D4ED8","League One":"#047857","Super League":"#7C3AED","Expansion":"#B45309","all":"#011e5c"};
+  const DEPT_COLORS = {"Corp Partnerships":"#7C3AED","Marketing":"#0369A1","Consumer Products":"#B45309","Ticketing":"#047857","Youth / Facilities":"#0891B2","League Initiatives":"#4338CA","General":"#475569"};
   const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  const DEPT_COLORS = {
-    "Corp Partnerships":"#7C3AED","Marketing":"#0369A1",
-    "Consumer Products":"#B45309","Ticketing":"#047857",
-    "Youth / Facilities":"#0891B2","League Initiatives":"#4338CA",
-    "General":"#475569","Youth / Clinics":"#0891B2",
-  };
+  const availableYears = [...new Set((log||[]).map(e=>new Date(e.ts).getFullYear()))].sort((a,b)=>b-a);
 
-  // Combined year + month filter
-  const timeFiltered = log.filter(e => {
-    const d = new Date(e.ts);
-    if (filterYear!=="all" && d.getFullYear()!==parseInt(filterYear)) return false;
-    if (filterMonth!=="all" && d.getMonth()!==parseInt(filterMonth)) return false;
+  // Filters
+  const timeFiltered = (log||[]).filter(e=>{
+    const d=new Date(e.ts);
+    if(filterYear!=="all"&&d.getFullYear()!==parseInt(filterYear)) return false;
+    if(filterMonth!=="all"&&d.getMonth()!==parseInt(filterMonth)) return false;
     return true;
   });
-
-  // Entry type filter
-  const typeFiltered = timeFiltered.filter(e => {
+  const typeFiltered = timeFiltered.filter(e=>{
     if(entryType==="strategic") return !e.recurring;
     if(entryType==="recurring") return e.recurring;
     return true;
   });
-
   const strategicLog = typeFiltered.filter(e=>!e.recurring);
   const recurringLog  = typeFiltered.filter(e=>e.recurring);
-
-  // League-filtered (for charts that use it)
   const leagueFiltered = league==="all" ? typeFiltered : typeFiltered.filter(e=>e.league===league);
   const externalLog = leagueFiltered.filter(e=>e.type==="External");
 
-  // ── Stats ────────────────────────────────────────────────────────────────
-  const total      = typeFiltered.length;
-  const strategic  = typeFiltered.filter(e=>!e.recurring).length;
-  const recurring  = typeFiltered.filter(e=>e.recurring).length;
-  const extCnt     = typeFiltered.filter(e=>e.type==="External").length;
-  const intCnt     = typeFiltered.filter(e=>e.type==="Internal").length;
-  const stratIdx   = typeFiltered.filter(e=>!e.recurring&&e.type==="External"&&e.index_score>0);
-  const avgIndex   = stratIdx.length>0?(stratIdx.reduce((s,e)=>s+Number(e.index_score||1),0)/stratIdx.length).toFixed(1):"—";
+  // Stats
+  const total     = typeFiltered.length;
+  const strategic = strategicLog.length;
+  const recurring = recurringLog.length;
+  const extCnt    = typeFiltered.filter(e=>e.type==="External").length;
+  const intCnt    = typeFiltered.filter(e=>e.type==="Internal").length;
+  const stratIdx  = typeFiltered.filter(e=>!e.recurring&&e.type==="External"&&e.index_score>0);
+  const avgIndex  = stratIdx.length>0?(stratIdx.reduce((s,e)=>s+Number(e.index_score||1),0)/stratIdx.length).toFixed(1):"—";
 
-  // ── Chart 1: Deliverables by League (uses typeFiltered, not league-filtered) ──
+  // Charts
   const byLeague = ["Championship","League One","Super League","Expansion"].map(l=>({
-    label:l, value:(typeFiltered||[]).filter(e=>e.league===l).length, color:LEAGUE_COLORS[l],
-  })).filter(d=>d&&d.value>0);
-
-  // ── Chart 2: Engagement by Vertical (dept) — respects league filter ──
-  const deptCounts = {};
-  leagueFiltered.forEach(e=>{
-    const key=e.dept||"General";
-    deptCounts[key]=(deptCounts[key]||0)+1;
-  });
-  const byDept = Object.entries(deptCounts)
-    .sort((a,b)=>b[1]-a[1])
-    .map(([dept,count])=>({label:dept,value:count,color:DEPT_COLORS[dept]||"#475569",pct:leagueFiltered.length?count/leagueFiltered.length:0}));
-
-  // ── Chart 3: Usage by League (pie) ──
-  const usageByLeague = ["Championship","League One","Super League","Expansion"].map(l=>({
-    label:l, value:typeFiltered.filter(e=>e.league===l).length, color:LEAGUE_COLORS[l],
+    label:l, value:typeFiltered.filter(e=>e.league===l).length, color:LEAGUE_COLORS[l]
   })).filter(d=>d.value>0);
 
-  // ── Top Clubs ────────────────────────────────────────────────────────────
+  const deptCounts = {};
+  leagueFiltered.forEach(e=>{ const k=e.dept||"General"; deptCounts[k]=(deptCounts[k]||0)+1; });
+  const byDept = Object.entries(deptCounts).sort((a,b)=>b[1]-a[1]).map(([dept,count])=>({label:dept,value:count,color:DEPT_COLORS[dept]||"#475569"}));
+
+  const usageByLeague = ["Championship","League One","Super League","Expansion"].map(l=>({
+    label:l, value:typeFiltered.filter(e=>e.league===l).length, color:LEAGUE_COLORS[l]
+  })).filter(d=>d.value>0);
+
+  // Club map
   const clubMap={};
   externalLog.forEach(e=>{
     const c=e.club||"Unknown";
     if(!clubMap[c])clubMap[c]={club:c,league:e.league||"",count:0,value:0,indexSum:0,indexCount:0};
     clubMap[c].count++;
-    const rate=getRackRate(e);
-    clubMap[c].value+=rate;
+    clubMap[c].value+=getRackRate(e);
     if(!e.recurring){clubMap[c].indexSum+=Number(e.index_score||1);clubMap[c].indexCount++;}
   });
   Object.values(clubMap).forEach(c=>{c.indexAvg=c.indexCount>0?c.indexSum/c.indexCount:0;});
-  const clubRows=Object.values(clubMap).sort((a,b)=>
-    metric==="value"?b.value-a.value:b.indexAvg-a.indexAvg
-  );
+  const clubRows=Object.values(clubMap).sort((a,b)=>metric==="value"?b.value-a.value:b.indexAvg-a.indexAvg);
   const displayClubs=showAllClubs?clubRows:clubRows.slice(0,10);
   const maxClub=clubRows.length?Math.max(...clubRows.map(c=>metric==="value"?(c.value||0):(c.indexAvg||0)),1):1;
 
-  if(!log.length) return(
+  if(!log||!log.length) return(
     <div style={{textAlign:"center",padding:"80px 0",fontFamily:"'DM Sans',sans-serif",color:"#9CA3AF"}}>
       No entries yet — go to a department tab and click LOG IT to get started.
     </div>
-  );
-
-  const Pill=({active,onClick,label,color="#011e5c"})=>(
-    <button onClick={onClick} style={{padding:"6px 14px",border:`1.5px solid ${active?color:"#E5E7EB"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:active?700:500,fontSize:12,cursor:"pointer",background:active?color:"#fff",color:active?"#fff":"#374151",transition:"all .15s",whiteSpace:"nowrap"}}>
-      {label}
-    </button>
   );
 
   const Card=({children,title,action})=>(
@@ -1057,12 +1025,12 @@ function Dashboard({ log, onExport, clubsByLeague }) {
   return(
     <div style={{display:"flex",flexDirection:"column",gap:20}}>
 
-      {/* ── FILTER BAR ──────────────────────────────────────────────────── */}
+      {/* Filter Bar */}
       <div style={{background:"#011e5c",borderRadius:16,padding:"16px 24px",boxShadow:"0 4px 24px rgba(0,0,0,.15)",display:"flex",flexDirection:"column",gap:12}}>
 
         {/* Row 1: League */}
         <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-          <span style={{fontSize:9,fontWeight:700,letterSpacing:1.2,color:"#1e3a7a",width:48,flexShrink:0}}>LEAGUE</span>
+          <span style={{fontSize:9,fontWeight:700,letterSpacing:1.2,color:"#4a6fa8",width:52,flexShrink:0}}>LEAGUE</span>
           {LEAGUES.map(l=>(
             <button key={l} onClick={()=>setLeague(l)} style={{padding:"6px 14px",border:`1.5px solid ${league===l?(LEAGUE_COLORS[l]||"#fff"):"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:league===l?700:400,fontSize:12,cursor:"pointer",background:league===l?"#fff":"transparent",color:league===l?"#011e5c":"#64748B",transition:"all .15s",whiteSpace:"nowrap"}}>
               {l==="all"?"All Leagues":l}
@@ -1072,44 +1040,21 @@ function Dashboard({ log, onExport, clubsByLeague }) {
 
         <div style={{height:1,background:"#0a2d6e"}}/>
 
-        {/* Row 2: Year + Month combined */}
+        {/* Row 2: Period */}
         <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-          <span style={{fontSize:9,fontWeight:700,letterSpacing:1.2,color:"#1e3a7a",width:48,flexShrink:0}}>PERIOD</span>
-          {/* Year */}
-          <div style={{display:"flex",gap:4,flexWrap:"wrap",alignItems:"center"}}>
-            <button onClick={()=>{setFilterYear("all");setFilterMonth("all");}} style={{padding:"6px 12px",border:`1.5px solid ${filterYear==="all"&&filterMonth==="all"?"#22C55E":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:filterYear==="all"?700:400,fontSize:12,cursor:"pointer",background:filterYear==="all"&&filterMonth==="all"?"#f51200":"transparent",color:filterYear==="all"&&filterMonth==="all"?"#fff":"#64748B",transition:"all .15s"}}>
-              All Time
-            </button>
-            {availableYears.map(y=>(
-              <button key={y} onClick={()=>setFilterYear(String(y))} style={{padding:"6px 12px",border:`1.5px solid ${filterYear===String(y)?"#22C55E":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:filterYear===String(y)?700:400,fontSize:12,cursor:"pointer",background:filterYear===String(y)?"#f51200":"transparent",color:filterYear===String(y)?"#fff":"#64748B",transition:"all .15s"}}>
-                {y}
-              </button>
-            ))}
-          </div>
-
-          {/* Month — only shows when a year is selected */}
-          {filterYear!=="all" && (
+          <span style={{fontSize:9,fontWeight:700,letterSpacing:1.2,color:"#4a6fa8",width:52,flexShrink:0}}>PERIOD</span>
+          <button onClick={()=>{setFilterYear("all");setFilterMonth("all");}} style={{padding:"6px 12px",border:`1.5px solid ${filterYear==="all"?"#f51200":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:filterYear==="all"?700:400,fontSize:12,cursor:"pointer",background:filterYear==="all"?"#f51200":"transparent",color:filterYear==="all"?"#fff":"#64748B",transition:"all .15s"}}>All Time</button>
+          {availableYears.map(y=>(
+            <button key={y} onClick={()=>{setFilterYear(String(y));setFilterMonth("all");}} style={{padding:"6px 12px",border:`1.5px solid ${filterYear===String(y)?"#f51200":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:filterYear===String(y)?700:400,fontSize:12,cursor:"pointer",background:filterYear===String(y)?"#f51200":"transparent",color:filterYear===String(y)?"#fff":"#64748B",transition:"all .15s"}}>{y}</button>
+          ))}
+          {filterYear!=="all"&&(
             <>
               <div style={{width:1,height:16,background:"#0a2d6e",margin:"0 4px"}}/>
-              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                <button onClick={()=>setFilterMonth("all")} style={{padding:"6px 10px",border:`1.5px solid ${filterMonth==="all"?"#fff":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:filterMonth==="all"?700:400,fontSize:11,cursor:"pointer",background:filterMonth==="all"?"#fff":"transparent",color:filterMonth==="all"?"#011e5c":"#64748B",transition:"all .15s"}}>
-                  All
-                </button>
-                {MONTHS.map((m,i)=>(
-                  <button key={m} onClick={()=>setFilterMonth(String(i))} style={{padding:"6px 10px",border:`1.5px solid ${filterMonth===String(i)?"#fff":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:filterMonth===String(i)?700:400,fontSize:11,cursor:"pointer",background:filterMonth===String(i)?"#fff":"transparent",color:filterMonth===String(i)?"#011e5c":"#64748B",transition:"all .15s"}}>
-                    {m}
-                  </button>
-                ))}
-              </div>
+              <button onClick={()=>setFilterMonth("all")} style={{padding:"5px 10px",border:`1.5px solid ${filterMonth==="all"?"#fff":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:filterMonth==="all"?700:400,fontSize:11,cursor:"pointer",background:filterMonth==="all"?"#fff":"transparent",color:filterMonth==="all"?"#011e5c":"#64748B",transition:"all .15s"}}>All</button>
+              {MONTHS.map((m,i)=>(
+                <button key={m} onClick={()=>setFilterMonth(String(i))} style={{padding:"5px 10px",border:`1.5px solid ${filterMonth===String(i)?"#fff":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:filterMonth===String(i)?700:400,fontSize:11,cursor:"pointer",background:filterMonth===String(i)?"#fff":"transparent",color:filterMonth===String(i)?"#011e5c":"#64748B",transition:"all .15s"}}>{m}</button>
+              ))}
             </>
-          )}
-
-          {/* Active period indicator */}
-          {(filterYear!=="all")&&(
-            <span style={{fontSize:11,color:"#f51200",marginLeft:4,fontFamily:"'DM Sans',sans-serif"}}>
-              ● {filterYear}{filterMonth!=="all"?` · ${MONTHS[parseInt(filterMonth)]}`:""} 
-              <button onClick={()=>{setFilterYear("all");setFilterMonth("all");}} style={{marginLeft:6,background:"none",border:"none",color:"#475569",fontSize:10,cursor:"pointer"}}>✕</button>
-            </span>
           )}
         </div>
 
@@ -1117,51 +1062,47 @@ function Dashboard({ log, onExport, clubsByLeague }) {
 
         {/* Row 3: Type + Metric + count + export */}
         <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-          <span style={{fontSize:9,fontWeight:700,letterSpacing:1.2,color:"#1e3a7a",width:48,flexShrink:0}}>TYPE</span>
+          <span style={{fontSize:9,fontWeight:700,letterSpacing:1.2,color:"#4a6fa8",width:52,flexShrink:0}}>TYPE</span>
           {[["all","All"],["strategic","Strategic"],["recurring","Recurring"]].map(([v,l])=>(
-            <button key={v} onClick={()=>setEntryType(v)} style={{padding:"6px 14px",border:`1.5px solid ${entryType===v?"#6366F1":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:entryType===v?700:400,fontSize:12,cursor:"pointer",background:entryType===v?"#f51200":"transparent",color:entryType===v?"#fff":"#64748B",transition:"all .15s"}}>
+            <button key={v} onClick={()=>setEntryType(v)} style={{padding:"6px 14px",border:`1.5px solid ${entryType===v?"#f51200":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:entryType===v?700:400,fontSize:12,cursor:"pointer",background:entryType===v?"#f51200":"transparent",color:entryType===v?"#fff":"#64748B",transition:"all .15s"}}>
               {l}
             </button>
           ))}
-
-          <div style={{width:1,height:16,background:"#0a2d6e",margin:"0 4px"}}/>
-
-          <span style={{fontSize:9,fontWeight:700,letterSpacing:1.2,color:"#1e3a7a",flexShrink:0}}>METRIC</span>
+          <div style={{width:1,height:16,background:"#0a2d6e",margin:"0 6px"}}/>
+          <span style={{fontSize:9,fontWeight:700,letterSpacing:1.2,color:"#4a6fa8",flexShrink:0}}>METRIC</span>
           {[["index","CPG Index"],["value","Value Delivered"]].map(([v,l])=>(
-            <button key={v} onClick={()=>setMetric(v)} style={{padding:"6px 14px",border:`1.5px solid ${metric===v?"#F59E0B":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:metric===v?700:400,fontSize:12,cursor:"pointer",background:metric===v?"#F59E0B":"transparent",color:metric===v?"#011e5c":"#64748B",transition:"all .15s"}}>
+            <button key={v} onClick={()=>setMetric(v)} style={{padding:"6px 14px",border:`1.5px solid ${metric===v?"#f51200":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:metric===v?700:400,fontSize:12,cursor:"pointer",background:metric===v?"#f51200":"transparent",color:metric===v?"#fff":"#64748B",transition:"all .15s"}}>
               {l}
             </button>
           ))}
-
           <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:10}}>
-            <span style={{fontSize:12,color:"#475569",whiteSpace:"nowrap"}}>
-              <span style={{color:"#fff",fontWeight:700}}>{total.toLocaleString()}</span> entries
-            </span>
-            <button onClick={onExport} style={{background:"#0a2d6e",color:"#64748B",border:"1px solid #334155",borderRadius:8,padding:"6px 14px",fontFamily:"'DM Sans',sans-serif",fontWeight:600,fontSize:12,cursor:"pointer",whiteSpace:"nowrap"}}>⬇ Export</button>
+            <span style={{fontSize:12,color:"#475569",whiteSpace:"nowrap"}}><span style={{color:"#fff",fontWeight:700}}>{total.toLocaleString()}</span> entries</span>
+            <button onClick={onExport} style={{background:"#0a2d6e",color:"#64748B",border:"1px solid #1e3a7a",borderRadius:8,padding:"6px 14px",fontFamily:"'DM Sans',sans-serif",fontWeight:600,fontSize:12,cursor:"pointer",whiteSpace:"nowrap"}}>⬇ Export</button>
           </div>
         </div>
       </div>
 
-      {/* ── HEADLINE KPIS ───────────────────────────────────────────────── */}
-      {(() => {
-        const totalValue = typeFiltered.reduce((s,e)=>s+getRackRate(e),0);
-        const stratValue = strategicLog.reduce((s,e)=>s+getRackRate(e),0);
-        const recurValue = recurringLog.reduce((s,e)=>s+getRackRate(e),0);
-        const isValue = metric==="value";
-        const kpis = isValue ? [
-          {label:"TOTAL VALUE DELIVERED", value:"$"+Math.round(totalValue).toLocaleString(), color:"#111827", sub:`${total} deliverables`},
-          {label:"STRATEGIC VALUE",        value:"$"+Math.round(stratValue).toLocaleString(), color:"#4338CA", sub:`${strategic} deliverables`},
-          {label:"RECURRING VALUE",        value:"$"+Math.round(recurValue).toLocaleString(), color:"#854D0E", sub:`${recurring} deliverables`},
-          {label:"EXT VALUE DELIVERED",    value:"$"+Math.round(typeFiltered.filter(e=>e.type==="External").reduce((s,e)=>s+getRackRate(e),0)).toLocaleString(), color:"#0369A1", sub:`${extCnt} external entries`},
-          {label:"CLUBS ENGAGED",          value:Object.keys(clubMap).length.toLocaleString(), color:"#047857", sub:league==="all"?"all leagues":league},
-        ] : [
-          {label:"TOTAL DELIVERABLES",     value:total.toLocaleString(),     color:"#111827", sub:`${extCnt} external · ${intCnt} internal`},
-          {label:"STRATEGIC",              value:strategic.toLocaleString(), color:"#4338CA", sub:`${total?Math.round(strategic/total*100):0}% of total`},
-          {label:"RECURRING",              value:recurring.toLocaleString(), color:"#854D0E", sub:`${total?Math.round(recurring/total*100):0}% of total`},
-          {label:"AVG CPG INDEX",          value:avgIndex,                   color:"#047857", sub:"strategic external"},
-          {label:"CLUBS ENGAGED",          value:Object.keys(clubMap).length.toLocaleString(), color:"#0369A1", sub:league==="all"?"all leagues":league},
+      {/* KPI Cards */}
+      {(()=>{
+        const totalValue=typeFiltered.reduce((s,e)=>s+getRackRate(e),0);
+        const stratValue=strategicLog.reduce((s,e)=>s+getRackRate(e),0);
+        const recurValue=recurringLog.reduce((s,e)=>s+getRackRate(e),0);
+        const extValue=typeFiltered.filter(e=>e.type==="External").reduce((s,e)=>s+getRackRate(e),0);
+        const isValue=metric==="value";
+        const kpis=isValue?[
+          {label:"TOTAL VALUE DELIVERED",value:"$"+Math.round(totalValue).toLocaleString(),color:"#111827",sub:`${total} deliverables`},
+          {label:"STRATEGIC VALUE",value:"$"+Math.round(stratValue).toLocaleString(),color:"#4338CA",sub:`${strategic} deliverables`},
+          {label:"RECURRING VALUE",value:"$"+Math.round(recurValue).toLocaleString(),color:"#854D0E",sub:`${recurring} deliverables`},
+          {label:"EXT VALUE DELIVERED",value:"$"+Math.round(extValue).toLocaleString(),color:"#0369A1",sub:`${extCnt} external entries`},
+          {label:"CLUBS ENGAGED",value:Object.keys(clubMap).length.toLocaleString(),color:"#047857",sub:league==="all"?"all leagues":league},
+        ]:[
+          {label:"TOTAL DELIVERABLES",value:total.toLocaleString(),color:"#111827",sub:`${extCnt} external · ${intCnt} internal`},
+          {label:"STRATEGIC",value:strategic.toLocaleString(),color:"#4338CA",sub:`${total?Math.round(strategic/total*100):0}% of total`},
+          {label:"RECURRING",value:recurring.toLocaleString(),color:"#854D0E",sub:`${total?Math.round(recurring/total*100):0}% of total`},
+          {label:"AVG CPG INDEX",value:avgIndex,color:"#047857",sub:"strategic external"},
+          {label:"CLUBS ENGAGED",value:Object.keys(clubMap).length.toLocaleString(),color:"#0369A1",sub:league==="all"?"all leagues":league},
         ];
-        return (
+        return(
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12}}>
             {kpis.map(({label,value,color,sub})=>(
               <div key={label} style={{background:"#fff",borderRadius:12,padding:"16px 20px",border:"1px solid #E5E7EB",boxShadow:"0 1px 4px rgba(0,0,0,.04)"}}>
@@ -1174,44 +1115,25 @@ function Dashboard({ log, onExport, clubsByLeague }) {
         );
       })()}
 
-      {/* ── ROW 1: BAR CHART + LEAGUE PIE ──────────────────────────────── */}
+      {/* Row 1: Bar + Pie */}
       <div style={{display:"grid",gridTemplateColumns:"1.4fr 1fr",gap:16}}>
-
-        {/* Deliverables by League — bar */}
         <Card title="Total Deliverables by League">
-          {byLeague.length>0
-            ?<HBarChart data={byLeague} color="#1D4ED8" height={52}/>
-            :<div style={{textAlign:"center",padding:"32px 0",color:"#9CA3AF",fontSize:13}}>No data for this filter.</div>
-          }
+          {byLeague.length>0?<HBarChart data={byLeague} color="#1D4ED8" height={52}/>:
+            <div style={{textAlign:"center",padding:"32px 0",color:"#9CA3AF",fontSize:13}}>No data for this filter.</div>}
         </Card>
-
-        {/* CPG Usage by League — donut */}
         <Card title="CPG Usage by League">
-          {usageByLeague.length>0
-            ?<DonutChart slices={usageByLeague} size={200} title={`${total}`} subtitle="total"/>
-            :<div style={{textAlign:"center",padding:"32px 0",color:"#9CA3AF",fontSize:13}}>No data.</div>
-          }
+          {usageByLeague.length>0?<DonutChart slices={usageByLeague} size={200} title={`${total}`} subtitle="total"/>:
+            <div style={{textAlign:"center",padding:"32px 0",color:"#9CA3AF",fontSize:13}}>No data.</div>}
         </Card>
       </div>
 
-      {/* ── ROW 2: VERTICAL PIE ─────────────────────────────────────────── */}
-      <Card
-        title={`CPG Engagement by Vertical${league!=="all"?` — ${league}`:""}`}
-        action={
-          league!=="all"&&(
-            <span style={{fontSize:12,color:"#6B7280",fontFamily:"'DM Sans',sans-serif"}}>
-              Filtered to <strong>{league}</strong> clubs only
-            </span>
-          )
-        }
-      >
-        {byDept.length>0
-          ?<DonutChart slices={byDept.map(d=>({...d,label:d.label}))} size={220} title={`${leagueFiltered.length}`} subtitle="deliverables"/>
-          :<div style={{textAlign:"center",padding:"32px 0",color:"#9CA3AF",fontSize:13}}>No data for this filter.</div>
-        }
+      {/* Row 2: Vertical pie */}
+      <Card title={`CPG Engagement by Vertical${league!=="all"?` — ${league}`:""}`}>
+        {byDept.length>0?<DonutChart slices={byDept} size={220} title={`${leagueFiltered.length}`} subtitle="deliverables"/>:
+          <div style={{textAlign:"center",padding:"32px 0",color:"#9CA3AF",fontSize:13}}>No data for this filter.</div>}
       </Card>
 
-      {/* ── ROW 3: TOP CLUBS ────────────────────────────────────────────── */}
+      {/* Row 3: Top Clubs */}
       <Card
         title={`Top Clubs — ${metric==="value"?"Value Delivered":"CPG Index Score"}`}
         action={metric==="value"&&<span style={{fontSize:11,color:"#F59E0B",background:"#FEF9C3",border:"1px solid #FDE68A",borderRadius:6,padding:"2px 8px",fontWeight:600}}>Conservative est. rates</span>}
@@ -1223,9 +1145,9 @@ function Dashboard({ log, onExport, clubsByLeague }) {
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {displayClubs.map((c,i)=>{
                 const ls=LEAGUE_STYLES[c.league]||LEAGUE_STYLES["League-wide"];
-                const metricVal=clubMetric==="value"?c.value:c.indexAvg;
-                const metricLabel=clubMetric==="value"?"$"+Math.round(c.value).toLocaleString():c.indexAvg.toFixed(2);
-                const pct=metricVal/maxClub*100;
+                const metricVal=metric==="value"?c.value:c.indexAvg;
+                const metricLabel=metric==="value"?"$"+Math.round(c.value).toLocaleString():c.indexAvg.toFixed(2);
+                const pct=maxClub>0?metricVal/maxClub*100:0;
                 return(
                   <div key={c.club} style={{display:"flex",alignItems:"center",gap:10}}>
                     <span style={{width:24,textAlign:"right",fontSize:12,fontWeight:700,color:"#9CA3AF",flexShrink:0}}>#{i+1}</span>
@@ -1245,8 +1167,7 @@ function Dashboard({ log, onExport, clubsByLeague }) {
               })}
             </div>
             {clubRows.length>10&&(
-              <button onClick={()=>setShowAllClubs(!showAllClubs)}
-                style={{marginTop:16,width:"100%",background:"#F8FAFC",border:"1px solid #E5E7EB",borderRadius:8,padding:"9px",fontFamily:"'DM Sans',sans-serif",fontWeight:600,fontSize:13,color:"#374151",cursor:"pointer"}}>
+              <button onClick={()=>setShowAllClubs(!showAllClubs)} style={{marginTop:16,width:"100%",background:"#F8FAFC",border:"1px solid #E5E7EB",borderRadius:8,padding:"9px",fontFamily:"'DM Sans',sans-serif",fontWeight:600,fontSize:13,color:"#374151",cursor:"pointer"}}>
                 {showAllClubs?`Show Top 10 ▲`:`Show All ${clubRows.length} Clubs ▼`}
               </button>
             )}
@@ -1254,19 +1175,16 @@ function Dashboard({ log, onExport, clubsByLeague }) {
         )}
       </Card>
 
-      {/* ── ROW 4: INT VS EXT WORKLOAD ──────────────────────────────────── */}
+      {/* Row 4: Workload */}
       <Card title="Internal vs. External Workload by Department">
-        {(() => {
-          const deptIntExt = ALL_DEPT_NAMES.map(dept=>{
+        {(()=>{
+          const deptIntExt=ALL_DEPT_NAMES.map(dept=>{
             const en=typeFiltered.filter(e=>e.dept===dept);
             return{dept,ext:en.filter(e=>e.type==="External").length,int:en.filter(e=>e.type==="Internal").length,total:en.length};
           }).filter(d=>d.total>0&&DEPT_CONFIG[d.dept]);
-
           if(!deptIntExt.length) return <div style={{textAlign:"center",padding:"24px 0",color:"#9CA3AF",fontSize:13}}>No data.</div>;
-
           return(
             <div>
-              {/* Overall */}
               <div style={{marginBottom:20,padding:"12px 16px",background:"#F8FAFC",borderRadius:10}}>
                 <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
                   <span style={{fontSize:12,color:"#6B7280",fontFamily:"'DM Sans',sans-serif"}}>Overall</span>
@@ -1281,7 +1199,6 @@ function Dashboard({ log, onExport, clubsByLeague }) {
                   {intCnt>0&&<div style={{width:`${total?(intCnt/total)*100:0}%`,background:"#047857",transition:"width .3s"}}/>}
                 </div>
               </div>
-              {/* Per dept */}
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 {deptIntExt.map(({dept,ext,int:intN,total:tot})=>{
                   const cfg=DEPT_CONFIG[dept];
@@ -1311,10 +1228,6 @@ function Dashboard({ log, onExport, clubsByLeague }) {
   );
 }
 
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  ACTIVITY EXPLORER
-// ─────────────────────────────────────────────────────────────────────────────
 
 function ActivityExplorer({ log, onRemove, onExportView }) {
   const [view,setView]=useState("club");
