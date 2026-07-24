@@ -1315,9 +1315,7 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
             {clubRows.map(c=>{
               const pct=total?c.value/total:0;
               const isExpanded=expandedClub===c.club;
-              const delivMap={};
-              c.entries.forEach(e=>{if(!delivMap[e.name])delivMap[e.name]={name:e.name,cat:e.cat,count:0,rate:e.rate};delivMap[e.name].count++;});
-              const delivList=Object.values(delivMap).sort((a,b)=>b.count-a.count);
+              const clubEntries=[...c.entries].sort((a,b)=>b.ts-a.ts);
               return(
                 <Fragment key={c.club}>
                   <tr onClick={()=>setExpandedClub(isExpanded?null:c.club)} style={{cursor:"pointer",background:isExpanded?"#F5F3FF":undefined}}>
@@ -1336,16 +1334,35 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
                   {isExpanded&&(
                     <tr key={`${c.club}-expand`}>
                       <td colSpan={6} style={{padding:"0 0 4px 0",background:"#F8F5FF"}}>
-                        <div style={{padding:"12px 20px 12px 36px"}}>
-                          <div style={{fontSize:11,fontWeight:700,color:"#7C3AED",letterSpacing:.5,marginBottom:8}}>DELIVERABLES LOGGED FOR {c.club.toUpperCase()}</div>
-                          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                            {delivList.map(d=>(
-                              <div key={d.name} style={{background:"#fff",border:"1px solid #DDD6FE",borderRadius:8,padding:"6px 12px",fontSize:12,color:"#374151"}}>
-                                <span style={{fontWeight:600}}>{d.name}</span>
-                                <span style={{color:"#9CA3AF",marginLeft:6}}>×{d.count}</span>
-                                {d.rate>0&&<span style={{color:"#7C3AED",marginLeft:6,fontSize:11}}>{fmt$(d.rate)}</span>}
-                              </div>
-                            ))}
+                        <div style={{padding:"12px 20px 16px 36px"}}>
+                          <div style={{fontSize:11,fontWeight:700,color:"#7C3AED",letterSpacing:.5,marginBottom:10}}>DELIVERABLES LOGGED FOR {c.club.toUpperCase()}</div>
+                          <div style={{background:"#fff",border:"1px solid #DDD6FE",borderRadius:10,overflow:"hidden"}}>
+                            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,fontFamily:"'DM Sans',sans-serif"}}>
+                              <thead>
+                                <tr>
+                                  <th style={{padding:"8px 12px",textAlign:"left",fontWeight:700,fontSize:10,letterSpacing:.5,color:"#7C3AED",background:"#F5F3FF",borderBottom:"1px solid #DDD6FE"}}>Date</th>
+                                  <th style={{padding:"8px 12px",textAlign:"left",fontWeight:700,fontSize:10,letterSpacing:.5,color:"#7C3AED",background:"#F5F3FF",borderBottom:"1px solid #DDD6FE"}}>Staff</th>
+                                  <th style={{padding:"8px 12px",textAlign:"left",fontWeight:700,fontSize:10,letterSpacing:.5,color:"#7C3AED",background:"#F5F3FF",borderBottom:"1px solid #DDD6FE"}}>Deliverable</th>
+                                  <th style={{padding:"8px 12px",textAlign:"left",fontWeight:700,fontSize:10,letterSpacing:.5,color:"#7C3AED",background:"#F5F3FF",borderBottom:"1px solid #DDD6FE"}}>Type</th>
+                                  <th style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontSize:10,letterSpacing:.5,color:"#7C3AED",background:"#F5F3FF",borderBottom:"1px solid #DDD6FE"}}>Rate</th>
+                                  <th style={{padding:"8px 12px",textAlign:"left",fontWeight:700,fontSize:10,letterSpacing:.5,color:"#7C3AED",background:"#F5F3FF",borderBottom:"1px solid #DDD6FE"}}>Notes</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {clubEntries.map((e,i)=>(
+                                  <tr key={e.id} style={{background:i%2?"#FAFAFA":"#fff"}}>
+                                    <td style={{padding:"8px 12px",color:"#6B7280",whiteSpace:"nowrap",borderBottom:"1px solid #F3F4F6"}}>{new Date(e.ts).toLocaleDateString()}</td>
+                                    <td style={{padding:"8px 12px",color:"#374151",fontWeight:600,whiteSpace:"nowrap",borderBottom:"1px solid #F3F4F6"}}>{e.staff}</td>
+                                    <td style={{padding:"8px 12px",color:"#111827",borderBottom:"1px solid #F3F4F6"}}>
+                                      <div style={{display:"flex",alignItems:"center",gap:6}}>{e.name}{e.recurring&&<RecurringBadge/>}</div>
+                                    </td>
+                                    <td style={{padding:"8px 12px",borderBottom:"1px solid #F3F4F6"}}><Badge type={e.type}/></td>
+                                    <td style={{padding:"8px 12px",textAlign:"right",color:"#7C3AED",fontWeight:700,whiteSpace:"nowrap",borderBottom:"1px solid #F3F4F6"}}>{e.rate>0?fmt$(e.rate):"—"}</td>
+                                    <td style={{padding:"8px 12px",color:"#6B7280",borderBottom:"1px solid #F3F4F6"}}>{e.notes||"—"}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
                           </div>
                         </div>
                       </td>
