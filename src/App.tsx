@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import * as XLSX from "xlsx";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -268,10 +268,10 @@ function PasswordScreen({ onUnlock }) {
     else { setError(true); setInput(""); }
   };
   return (
-    <div style={{minHeight:"100vh",background:"#0F172A",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'DM Sans',sans-serif"}}>
+    <div style={{minHeight:"100vh",background:"#011e5c",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'DM Sans',sans-serif"}}>
       <div style={{background:"#fff",borderRadius:20,padding:"48px 40px",width:"100%",maxWidth:400,textAlign:"center",boxShadow:"0 24px 64px rgba(0,0,0,.4)"}}>
         <div style={{fontSize:36,marginBottom:12}}>🏟️</div>
-        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:26,color:"#111827",marginBottom:6}}>Dept Tracker</div>
+        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:26,color:"#011e5c",marginBottom:6}}>CPG Deliverable Tracker</div>
         <div style={{fontSize:14,color:"#6B7280",marginBottom:32}}>Enter your password to continue</div>
         <input type="password" value={input} autoFocus
           onChange={e=>{setInput(e.target.value);setError(false);}}
@@ -279,7 +279,7 @@ function PasswordScreen({ onUnlock }) {
           style={{width:"100%",fontFamily:"'DM Sans',sans-serif",fontSize:15,border:`2px solid ${error?"#EF4444":"#E5E7EB"}`,borderRadius:10,padding:"12px 16px",outline:"none",marginBottom:8,background:error?"#FEF2F2":"#fff",color:"#111",textAlign:"center",letterSpacing:2}}
         />
         {error&&<div style={{color:"#EF4444",fontSize:13,fontWeight:600,marginBottom:8}}>Incorrect password. Try again.</div>}
-        <button onClick={attempt} style={{width:"100%",background:"#0F172A",color:"#fff",border:"none",borderRadius:10,padding:13,fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:15,cursor:"pointer",marginTop:8}}>Enter →</button>
+        <button onClick={attempt} style={{width:"100%",background:"#011e5c",color:"#fff",border:"none",borderRadius:10,padding:13,fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:15,cursor:"pointer",marginTop:8}}>Enter →</button>
       </div>
     </div>
   );
@@ -948,7 +948,7 @@ function Dashboard({ log, onExport, clubsByLeague }) {
   const LEAGUES = ["all","Championship","League One","Super League","Expansion"];
   const LEAGUE_COLORS = {
     "Championship":"#1D4ED8","League One":"#047857",
-    "Super League":"#7C3AED","Expansion":"#B45309","all":"#0F172A",
+    "Super League":"#7C3AED","Expansion":"#B45309","all":"#011e5c",
   };
 
   const availableYears = [...new Set(log.map(e=>new Date(e.ts).getFullYear()))].sort((a,b)=>b-a);
@@ -1031,7 +1031,7 @@ function Dashboard({ log, onExport, clubsByLeague }) {
     </div>
   );
 
-  const Pill=({active,onClick,label,color="#0F172A"})=>(
+  const Pill=({active,onClick,label,color="#011e5c"})=>(
     <button onClick={onClick} style={{padding:"6px 14px",border:`1.5px solid ${active?color:"#E5E7EB"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:active?700:500,fontSize:12,cursor:"pointer",background:active?color:"#fff",color:active?"#fff":"#374151",transition:"all .15s",whiteSpace:"nowrap"}}>
       {label}
     </button>
@@ -1053,30 +1053,30 @@ function Dashboard({ log, onExport, clubsByLeague }) {
     <div style={{display:"flex",flexDirection:"column",gap:20}}>
 
       {/* ── FILTER BAR ──────────────────────────────────────────────────── */}
-      <div style={{background:"#0F172A",borderRadius:16,padding:"16px 24px",boxShadow:"0 4px 24px rgba(0,0,0,.15)",display:"flex",flexDirection:"column",gap:12}}>
+      <div style={{background:"#011e5c",borderRadius:16,padding:"16px 24px",boxShadow:"0 4px 24px rgba(0,0,0,.15)",display:"flex",flexDirection:"column",gap:12}}>
 
         {/* Row 1: League */}
         <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-          <span style={{fontSize:9,fontWeight:700,letterSpacing:1.2,color:"#334155",width:48,flexShrink:0}}>LEAGUE</span>
+          <span style={{fontSize:9,fontWeight:700,letterSpacing:1.2,color:"#1e3a7a",width:48,flexShrink:0}}>LEAGUE</span>
           {LEAGUES.map(l=>(
-            <button key={l} onClick={()=>setLeague(l)} style={{padding:"6px 14px",border:`1.5px solid ${league===l?(LEAGUE_COLORS[l]||"#fff"):"#1E293B"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:league===l?700:400,fontSize:12,cursor:"pointer",background:league===l?"#fff":"transparent",color:league===l?"#0F172A":"#64748B",transition:"all .15s",whiteSpace:"nowrap"}}>
+            <button key={l} onClick={()=>setLeague(l)} style={{padding:"6px 14px",border:`1.5px solid ${league===l?(LEAGUE_COLORS[l]||"#fff"):"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:league===l?700:400,fontSize:12,cursor:"pointer",background:league===l?"#fff":"transparent",color:league===l?"#011e5c":"#64748B",transition:"all .15s",whiteSpace:"nowrap"}}>
               {l==="all"?"All Leagues":l}
             </button>
           ))}
         </div>
 
-        <div style={{height:1,background:"#1E293B"}}/>
+        <div style={{height:1,background:"#0a2d6e"}}/>
 
         {/* Row 2: Year + Month combined */}
         <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-          <span style={{fontSize:9,fontWeight:700,letterSpacing:1.2,color:"#334155",width:48,flexShrink:0}}>PERIOD</span>
+          <span style={{fontSize:9,fontWeight:700,letterSpacing:1.2,color:"#1e3a7a",width:48,flexShrink:0}}>PERIOD</span>
           {/* Year */}
           <div style={{display:"flex",gap:4,flexWrap:"wrap",alignItems:"center"}}>
-            <button onClick={()=>{setFilterYear("all");setFilterMonth("all");}} style={{padding:"6px 12px",border:`1.5px solid ${filterYear==="all"&&filterMonth==="all"?"#22C55E":"#1E293B"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:filterYear==="all"?700:400,fontSize:12,cursor:"pointer",background:filterYear==="all"&&filterMonth==="all"?"#22C55E":"transparent",color:filterYear==="all"&&filterMonth==="all"?"#fff":"#64748B",transition:"all .15s"}}>
+            <button onClick={()=>{setFilterYear("all");setFilterMonth("all");}} style={{padding:"6px 12px",border:`1.5px solid ${filterYear==="all"&&filterMonth==="all"?"#22C55E":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:filterYear==="all"?700:400,fontSize:12,cursor:"pointer",background:filterYear==="all"&&filterMonth==="all"?"#f51200":"transparent",color:filterYear==="all"&&filterMonth==="all"?"#fff":"#64748B",transition:"all .15s"}}>
               All Time
             </button>
             {availableYears.map(y=>(
-              <button key={y} onClick={()=>setFilterYear(String(y))} style={{padding:"6px 12px",border:`1.5px solid ${filterYear===String(y)?"#22C55E":"#1E293B"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:filterYear===String(y)?700:400,fontSize:12,cursor:"pointer",background:filterYear===String(y)?"#22C55E":"transparent",color:filterYear===String(y)?"#fff":"#64748B",transition:"all .15s"}}>
+              <button key={y} onClick={()=>setFilterYear(String(y))} style={{padding:"6px 12px",border:`1.5px solid ${filterYear===String(y)?"#22C55E":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:filterYear===String(y)?700:400,fontSize:12,cursor:"pointer",background:filterYear===String(y)?"#f51200":"transparent",color:filterYear===String(y)?"#fff":"#64748B",transition:"all .15s"}}>
                 {y}
               </button>
             ))}
@@ -1085,13 +1085,13 @@ function Dashboard({ log, onExport, clubsByLeague }) {
           {/* Month — only shows when a year is selected */}
           {filterYear!=="all" && (
             <>
-              <div style={{width:1,height:16,background:"#1E293B",margin:"0 4px"}}/>
+              <div style={{width:1,height:16,background:"#0a2d6e",margin:"0 4px"}}/>
               <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                <button onClick={()=>setFilterMonth("all")} style={{padding:"6px 10px",border:`1.5px solid ${filterMonth==="all"?"#fff":"#1E293B"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:filterMonth==="all"?700:400,fontSize:11,cursor:"pointer",background:filterMonth==="all"?"#fff":"transparent",color:filterMonth==="all"?"#0F172A":"#64748B",transition:"all .15s"}}>
+                <button onClick={()=>setFilterMonth("all")} style={{padding:"6px 10px",border:`1.5px solid ${filterMonth==="all"?"#fff":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:filterMonth==="all"?700:400,fontSize:11,cursor:"pointer",background:filterMonth==="all"?"#fff":"transparent",color:filterMonth==="all"?"#011e5c":"#64748B",transition:"all .15s"}}>
                   All
                 </button>
                 {MONTHS.map((m,i)=>(
-                  <button key={m} onClick={()=>setFilterMonth(String(i))} style={{padding:"6px 10px",border:`1.5px solid ${filterMonth===String(i)?"#fff":"#1E293B"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:filterMonth===String(i)?700:400,fontSize:11,cursor:"pointer",background:filterMonth===String(i)?"#fff":"transparent",color:filterMonth===String(i)?"#0F172A":"#64748B",transition:"all .15s"}}>
+                  <button key={m} onClick={()=>setFilterMonth(String(i))} style={{padding:"6px 10px",border:`1.5px solid ${filterMonth===String(i)?"#fff":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:filterMonth===String(i)?700:400,fontSize:11,cursor:"pointer",background:filterMonth===String(i)?"#fff":"transparent",color:filterMonth===String(i)?"#011e5c":"#64748B",transition:"all .15s"}}>
                     {m}
                   </button>
                 ))}
@@ -1101,29 +1101,29 @@ function Dashboard({ log, onExport, clubsByLeague }) {
 
           {/* Active period indicator */}
           {(filterYear!=="all")&&(
-            <span style={{fontSize:11,color:"#22C55E",marginLeft:4,fontFamily:"'DM Sans',sans-serif"}}>
+            <span style={{fontSize:11,color:"#f51200",marginLeft:4,fontFamily:"'DM Sans',sans-serif"}}>
               ● {filterYear}{filterMonth!=="all"?` · ${MONTHS[parseInt(filterMonth)]}`:""} 
               <button onClick={()=>{setFilterYear("all");setFilterMonth("all");}} style={{marginLeft:6,background:"none",border:"none",color:"#475569",fontSize:10,cursor:"pointer"}}>✕</button>
             </span>
           )}
         </div>
 
-        <div style={{height:1,background:"#1E293B"}}/>
+        <div style={{height:1,background:"#0a2d6e"}}/>
 
         {/* Row 3: Type + Metric + count + export */}
         <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-          <span style={{fontSize:9,fontWeight:700,letterSpacing:1.2,color:"#334155",width:48,flexShrink:0}}>TYPE</span>
+          <span style={{fontSize:9,fontWeight:700,letterSpacing:1.2,color:"#1e3a7a",width:48,flexShrink:0}}>TYPE</span>
           {[["all","All"],["strategic","Strategic"],["recurring","Recurring"]].map(([v,l])=>(
-            <button key={v} onClick={()=>setEntryType(v)} style={{padding:"6px 14px",border:`1.5px solid ${entryType===v?"#6366F1":"#1E293B"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:entryType===v?700:400,fontSize:12,cursor:"pointer",background:entryType===v?"#6366F1":"transparent",color:entryType===v?"#fff":"#64748B",transition:"all .15s"}}>
+            <button key={v} onClick={()=>setEntryType(v)} style={{padding:"6px 14px",border:`1.5px solid ${entryType===v?"#6366F1":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:entryType===v?700:400,fontSize:12,cursor:"pointer",background:entryType===v?"#f51200":"transparent",color:entryType===v?"#fff":"#64748B",transition:"all .15s"}}>
               {l}
             </button>
           ))}
 
-          <div style={{width:1,height:16,background:"#1E293B",margin:"0 4px"}}/>
+          <div style={{width:1,height:16,background:"#0a2d6e",margin:"0 4px"}}/>
 
-          <span style={{fontSize:9,fontWeight:700,letterSpacing:1.2,color:"#334155",flexShrink:0}}>METRIC</span>
+          <span style={{fontSize:9,fontWeight:700,letterSpacing:1.2,color:"#1e3a7a",flexShrink:0}}>METRIC</span>
           {[["index","CPG Index"],["value","Value Delivered"]].map(([v,l])=>(
-            <button key={v} onClick={()=>setMetric(v)} style={{padding:"6px 14px",border:`1.5px solid ${metric===v?"#F59E0B":"#1E293B"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:metric===v?700:400,fontSize:12,cursor:"pointer",background:metric===v?"#F59E0B":"transparent",color:metric===v?"#0F172A":"#64748B",transition:"all .15s"}}>
+            <button key={v} onClick={()=>setMetric(v)} style={{padding:"6px 14px",border:`1.5px solid ${metric===v?"#F59E0B":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:metric===v?700:400,fontSize:12,cursor:"pointer",background:metric===v?"#F59E0B":"transparent",color:metric===v?"#011e5c":"#64748B",transition:"all .15s"}}>
               {l}
             </button>
           ))}
@@ -1132,7 +1132,7 @@ function Dashboard({ log, onExport, clubsByLeague }) {
             <span style={{fontSize:12,color:"#475569",whiteSpace:"nowrap"}}>
               <span style={{color:"#fff",fontWeight:700}}>{total.toLocaleString()}</span> entries
             </span>
-            <button onClick={onExport} style={{background:"#1E293B",color:"#64748B",border:"1px solid #334155",borderRadius:8,padding:"6px 14px",fontFamily:"'DM Sans',sans-serif",fontWeight:600,fontSize:12,cursor:"pointer",whiteSpace:"nowrap"}}>⬇ Export</button>
+            <button onClick={onExport} style={{background:"#0a2d6e",color:"#64748B",border:"1px solid #334155",borderRadius:8,padding:"6px 14px",fontFamily:"'DM Sans',sans-serif",fontWeight:600,fontSize:12,cursor:"pointer",whiteSpace:"nowrap"}}>⬇ Export</button>
           </div>
         </div>
       </div>
@@ -1358,7 +1358,7 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
   Object.values(staffMap).forEach(s=>{s.indexAvg=s.indexCount>0?(s.indexSum/s.indexCount).toFixed(1):"—";});
   const staffRows=Object.values(staffMap).sort((a,b)=>b.value-a.value);
 
-  const tBtn=active=>({padding:"8px 18px",border:"none",borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:13,cursor:"pointer",transition:"all .15s",background:active?"#0F172A":"transparent",color:active?"#fff":"#6B7280"});
+  const tBtn=active=>({padding:"8px 18px",border:"none",borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:13,cursor:"pointer",transition:"all .15s",background:active?"#011e5c":"transparent",color:active?"#fff":"#6B7280"});
 
   const [selected,setSelected]=useState(new Set());
   const [confirm,setConfirm]=useState(false);
@@ -1400,8 +1400,8 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
               c.entries.forEach(e=>{if(!delivMap[e.name])delivMap[e.name]={name:e.name,cat:e.cat,count:0,rate:e.rate};delivMap[e.name].count++;});
               const delivList=Object.values(delivMap).sort((a,b)=>b.count-a.count);
               return(
-                <>
-                  <tr key={c.club} onClick={()=>setExpandedClub(isExpanded?null:c.club)} style={{cursor:"pointer",background:isExpanded?"#F5F3FF":undefined}}>
+                <Fragment key={c.club}>
+                  <tr onClick={()=>setExpandedClub(isExpanded?null:c.club)} style={{cursor:"pointer",background:isExpanded?"#F5F3FF":undefined}}>
                     <TD bold color="#111827">
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
                         <span style={{fontSize:10,color:"#9CA3AF",transition:"transform .15s",display:"inline-block",transform:isExpanded?"rotate(90deg)":"rotate(0deg)"}}>▶</span>
@@ -1432,7 +1432,7 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               );
             })}
           </tbody>
@@ -1620,7 +1620,7 @@ function exportExcel(log) {
   const url=URL.createObjectURL(blob);
   const a=document.createElement("a");
   const pad=n=>String(n).padStart(2,"0");
-  a.download=`cpg_tracker_${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}.xlsx`;
+  a.download=`cpg_deliverable_tracker_${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}.xlsx`;
   a.href=url;document.body.appendChild(a);a.click();
   setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},1000);
 }
@@ -1667,16 +1667,16 @@ const NAV_ITEMS = [
 
 function AppNav({ activeTab, setActiveTab, loading }) {
   return (
-    <div style={{width:220,flexShrink:0,background:"#0F172A",minHeight:"100vh",display:"flex",flexDirection:"column",position:"sticky",top:0,zIndex:100,borderRight:"1px solid #1E293B"}}>
+    <div style={{width:220,flexShrink:0,background:"#011e5c",minHeight:"100vh",display:"flex",flexDirection:"column",position:"sticky",top:0,zIndex:100,borderRight:"1px solid #1E293B"}}>
 
       {/* Brand */}
       <div style={{padding:"20px 16px 16px",borderBottom:"1px solid #1E293B"}}>
-        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:20,color:"#fff",letterSpacing:"-.3px",marginBottom:6}}>Dept Tracker</div>
+        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:18,color:"#fff",letterSpacing:"-.3px",marginBottom:6}}>CPG Deliverable Tracker</div>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
           <div style={{width:6,height:6,borderRadius:"50%",background:loading?"#F59E0B":"#22C55E",boxShadow:loading?"none":"0 0 8px #22C55E66"}}/>
           <span style={{fontSize:11,color:"#475569",fontFamily:"'DM Sans',sans-serif"}}>{loading?"syncing…":"live"}</span>
         </div>
-        <div style={{fontSize:10,color:"#334155",fontFamily:"'DM Sans',sans-serif",marginTop:4,letterSpacing:.3}}>USL Club Performance Group</div>
+        <div style={{fontSize:10,color:"#1e3a7a",fontFamily:"'DM Sans',sans-serif",marginTop:4,letterSpacing:.3}}>USL Club Performance Group</div>
       </div>
 
       {/* Nav items */}
@@ -1687,17 +1687,17 @@ function AppNav({ activeTab, setActiveTab, loading }) {
           const isActive=activeTab===item.id;
           return(
             <button key={item.id} onClick={()=>setActiveTab(item.id)}
-              style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"9px 12px",border:"none",borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:isActive?700:400,cursor:"pointer",textAlign:"left",background:isActive?"#fff":"transparent",color:isActive?"#0F172A":"#64748B",transition:"all .15s"}}>
+              style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"9px 12px",border:"none",borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:isActive?700:400,cursor:"pointer",textAlign:"left",background:isActive?"#fff":"transparent",color:isActive?"#011e5c":"#64748B",transition:"all .15s"}}>
               <span style={{fontSize:14,opacity:isActive?1:.7}}>{item.emoji||"◈"}</span>
               {item.label}
-              {isActive&&<div style={{marginLeft:"auto",width:5,height:5,borderRadius:"50%",background:"#0F172A",flexShrink:0}}/>}
+              {isActive&&<div style={{marginLeft:"auto",width:5,height:5,borderRadius:"50%",background:"#011e5c",flexShrink:0}}/>}
             </button>
           );
         })}
 
         {/* Dept section */}
         <div style={{margin:"10px 0 4px",padding:"0 12px"}}>
-          <span style={{fontSize:9,fontWeight:700,letterSpacing:1.2,color:"#334155",textTransform:"uppercase"}}>Departments</span>
+          <span style={{fontSize:9,fontWeight:700,letterSpacing:1.2,color:"#1e3a7a",textTransform:"uppercase"}}>Departments</span>
         </div>
 
         {NAV_ITEMS.filter(i=>i.group==="dept").map(item=>{
@@ -1716,7 +1716,7 @@ function AppNav({ activeTab, setActiveTab, loading }) {
 
       {/* Footer */}
       <div style={{padding:"12px 16px",borderTop:"1px solid #1E293B"}}>
-        <div style={{fontSize:10,color:"#1E293B",fontFamily:"'DM Sans',sans-serif"}}>v2.0 · {new Date().getFullYear()}</div>
+        <div style={{fontSize:10,color:"#0a2d6e",fontFamily:"'DM Sans',sans-serif"}}>v2.0 · {new Date().getFullYear()}</div>
       </div>
     </div>
   );
