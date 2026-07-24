@@ -846,7 +846,8 @@ function getRackRate(entry) {
 
 function HBarChart({ data, color, valueLabel, height=56 }) {
   const [hovered, setHovered] = useState(null);
-  const max = Math.max(...data.map(d=>d.value), 1);
+  if (!data||!data.length) return <div style={{textAlign:"center",padding:"32px 0",color:"#9CA3AF",fontSize:13}}>No data</div>;
+  const max = Math.max(...data.map(d=>d.value||0), 1);
   return (
     <div style={{display:"flex",flexDirection:"column",gap:12}}>
       {data.map((d,i) => {
@@ -875,11 +876,12 @@ function HBarChart({ data, color, valueLabel, height=56 }) {
 
 function DonutChart({ slices, size=220, title, subtitle }) {
   const [hovered, setHovered] = useState(null);
-  const total = slices.reduce((s,sl)=>s+sl.value,0);
-  if (!total) return null;
+  const safeSlices = (slices||[]).filter(s=>s&&Number(s.value)>0);
+  const total = safeSlices.reduce((s,sl)=>s+sl.value,0);
+  if (!total||!safeSlices.length) return <div style={{textAlign:"center",padding:"40px 0",color:"#9CA3AF",fontSize:13}}>No data</div>;
   const r = size/2-16, cx=size/2, cy=size/2;
   let cumAngle = -Math.PI/2;
-  const arcs = slices.map((sl,i) => {
+  const arcs = safeSlices.map((sl,i) => {
     const angle = (sl.value/total)*2*Math.PI;
     const x1=cx+r*Math.cos(cumAngle), y1=cy+r*Math.sin(cumAngle);
     cumAngle+=angle;
@@ -990,8 +992,8 @@ function Dashboard({ log, onExport, clubsByLeague }) {
 
   // ── Chart 1: Deliverables by League (uses typeFiltered, not league-filtered) ──
   const byLeague = ["Championship","League One","Super League","Expansion"].map(l=>({
-    label:l, value:typeFiltered.filter(e=>e.league===l).length, color:LEAGUE_COLORS[l],
-  })).filter(d=>d.value>0);
+    label:l, value:(typeFiltered||[]).filter(e=>e.league===l).length, color:LEAGUE_COLORS[l],
+  })).filter(d=>d&&d.value>0);
 
   // ── Chart 2: Engagement by Vertical (dept) — respects league filter ──
   const deptCounts = {};
@@ -1023,7 +1025,7 @@ function Dashboard({ log, onExport, clubsByLeague }) {
     metric==="value"?b.value-a.value:b.indexAvg-a.indexAvg
   );
   const displayClubs=showAllClubs?clubRows:clubRows.slice(0,10);
-  const maxClub=Math.max(...clubRows.map(c=>metric==="value"?c.value:c.indexAvg),1);
+  const maxClub=clubRows.length?Math.max(...clubRows.map(c=>metric==="value"?(c.value||0):(c.indexAvg||0)),1):1;
 
   if(!log.length) return(
     <div style={{textAlign:"center",padding:"80px 0",fontFamily:"'DM Sans',sans-serif",color:"#9CA3AF"}}>
