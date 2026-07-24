@@ -337,6 +337,54 @@ function TblWrap({ children }) {
 const TH = ({ children, right }) => <th style={{padding:"11px 14px",fontWeight:700,fontSize:11,letterSpacing:.5,color:"#6B7280",borderBottom:"1px solid #E5E7EB",background:"#F9FAFB",textAlign:right?"right":"left"}}>{children}</th>;
 const TD = ({ children, right, bold, color }) => <td style={{padding:"11px 14px",textAlign:right?"right":"left",fontWeight:bold?700:400,color:color||"#374151"}}>{children}</td>;
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  LINE ITEM TABLE — shared drill-down used by Club / League / Dept / Staff views
+// ─────────────────────────────────────────────────────────────────────────────
+
+function LineItemTable({ entries, hide=[] }) {
+  const ALL_COLS = [
+    { key:"date",  label:"Date",              render:e=>new Date(e.ts).toLocaleDateString() },
+    { key:"staff", label:"Staff",             render:e=>e.staff },
+    { key:"dept",  label:"Dept",              render:e=><DeptChip dept={e.dept}/> },
+    { key:"name",  label:"Deliverable",       render:e=><div style={{display:"flex",alignItems:"center",gap:6}}>{e.name}{e.recurring&&<RecurringBadge/>}</div> },
+    { key:"type",  label:"Type",              render:e=><Badge type={e.type}/> },
+    { key:"club",  label:"Club / Recipient",  render:e=>e.club },
+    { key:"league",label:"League",            render:e=><LeagueBadge league={e.league||"League-wide"}/> },
+    { key:"rate",  label:"Rate",   right:true,render:e=>e.rate>0?fmt$(e.rate):"—" },
+    { key:"notes", label:"Notes",             render:e=>e.notes||"—" },
+  ];
+  const cols = ALL_COLS.filter(c=>!hide.includes(c.key));
+  const sorted = [...entries].sort((a,b)=>b.ts-a.ts);
+  const thStyle = right => ({padding:"8px 12px",textAlign:right?"right":"left",fontWeight:700,fontSize:10,letterSpacing:.5,color:"#7C3AED",background:"#F5F3FF",borderBottom:"1px solid #DDD6FE"});
+  const tdStyle = (key,right) => ({padding:"8px 12px",textAlign:right?"right":"left",whiteSpace:(key==="date"||key==="staff"||key==="rate")?"nowrap":"normal",color:key==="rate"?"#7C3AED":key==="staff"?"#374151":key==="name"?"#111827":"#6B7280",fontWeight:(key==="rate"||key==="staff")?700:400,borderBottom:"1px solid #F3F4F6"});
+
+  return (
+    <div style={{background:"#fff",border:"1px solid #DDD6FE",borderRadius:10,overflow:"hidden"}}>
+      <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,fontFamily:"'DM Sans',sans-serif"}}>
+        <thead>
+          <tr>{cols.map(c=><th key={c.key} style={thStyle(c.right)}>{c.label}</th>)}</tr>
+        </thead>
+        <tbody>
+          {sorted.map((e,i)=>(
+            <tr key={e.id} style={{background:i%2?"#FAFAFA":"#fff"}}>
+              {cols.map(c=><td key={c.key} style={tdStyle(c.key,c.right)}>{c.render(e)}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ExpandPanel({ heading, children }) {
+  return (
+    <div style={{padding:"12px 20px 16px 36px"}}>
+      <div style={{fontSize:11,fontWeight:700,color:"#7C3AED",letterSpacing:.5,marginBottom:10}}>{heading}</div>
+      {children}
+    </div>
+  );
+}
+
 function Toast({ msg, color, onDone }) {
   useEffect(()=>{ const t=setTimeout(onDone,2800); return()=>clearTimeout(t); },[onDone]);
   return <div style={{position:"fixed",bottom:28,right:28,zIndex:9999,background:color,color:"#fff",padding:"14px 22px",borderRadius:12,fontWeight:600,fontSize:15,boxShadow:"0 8px 32px rgba(0,0,0,.22)",fontFamily:"'DM Sans',sans-serif"}}>{msg}</div>;
@@ -1232,6 +1280,9 @@ function Dashboard({ log, onExport, clubsByLeague }) {
 function ActivityExplorer({ log, onRemove, onExportView }) {
   const [view,setView]=useState("club");
   const [expandedClub, setExpandedClub]=useState(null);
+  const [expandedLeague, setExpandedLeague]=useState(null);
+  const [expandedDept, setExpandedDept]=useState(null);
+  const [expandedStaff, setExpandedStaff]=useState(null);
   const total=log.reduce((s,e)=>s+e.rate,0);
 
   // By Club
@@ -1250,8 +1301,9 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
   const leagueMap={};
   log.filter(e=>e.type==="External").forEach(e=>{
     const l=e.league||"Unknown";
-    if(!leagueMap[l])leagueMap[l]={league:l,count:0,value:0,indexSum:0,indexCount:0,clubs:new Set()};
+    if(!leagueMap[l])leagueMap[l]={league:l,count:0,value:0,indexSum:0,indexCount:0,clubs:new Set(),entries:[]};
     leagueMap[l].count++;leagueMap[l].value+=e.rate;leagueMap[l].clubs.add(e.club);
+    leagueMap[l].entries.push(e);
     if(!e.recurring&&e.index_score){leagueMap[l].indexSum+=Number(e.index_score);leagueMap[l].indexCount++;}
   });
   Object.values(leagueMap).forEach(l=>{l.indexAvg=l.indexCount>0?(l.indexSum/l.indexCount).toFixed(1):"—";l.clubCount=l.clubs.size;});
@@ -1260,8 +1312,9 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
   // By Dept
   const deptMap={};
   log.forEach(e=>{
-    if(!deptMap[e.dept])deptMap[e.dept]={dept:e.dept,count:0,value:0,ext:0,int:0};
+    if(!deptMap[e.dept])deptMap[e.dept]={dept:e.dept,count:0,value:0,ext:0,int:0,entries:[]};
     deptMap[e.dept].count++;deptMap[e.dept].value+=e.rate;
+    deptMap[e.dept].entries.push(e);
     if(e.type==="External")deptMap[e.dept].ext++;else deptMap[e.dept].int++;
   });
   const deptRows=Object.values(deptMap).sort((a,b)=>b.value-a.value);
@@ -1269,8 +1322,9 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
   // By Staff
   const staffMap={};
   log.forEach(e=>{
-    if(!staffMap[e.staff])staffMap[e.staff]={staff:e.staff,count:0,value:0,ext:0,int:0,indexSum:0,indexCount:0};
+    if(!staffMap[e.staff])staffMap[e.staff]={staff:e.staff,count:0,value:0,ext:0,int:0,indexSum:0,indexCount:0,entries:[]};
     staffMap[e.staff].count++;staffMap[e.staff].value+=e.rate;
+    staffMap[e.staff].entries.push(e);
     if(e.type==="External")staffMap[e.staff].ext++;else staffMap[e.staff].int++;
     if(!e.recurring&&e.index_score&&e.type==="External"){staffMap[e.staff].indexSum+=Number(e.index_score);staffMap[e.staff].indexCount++;}
   });
@@ -1302,7 +1356,7 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:24,flexWrap:"wrap",gap:12}}>
         <div style={{display:"flex",background:"#F1F5F9",borderRadius:12,padding:4,gap:2}}>
           {[["club","By Club"],["league","By League"],["dept","By Department"],["staff","By Staff"],["log","Full Log"]].map(([v,label])=>(
-            <button key={v} onClick={()=>{setView(v);setExpandedClub(null);}} style={tBtn(view===v)}>{label}</button>
+            <button key={v} onClick={()=>{setView(v);setExpandedClub(null);setExpandedLeague(null);setExpandedDept(null);setExpandedStaff(null);}} style={tBtn(view===v)}>{label}</button>
           ))}
         </div>
         <button onClick={()=>onExportView(view,{clubRows,deptRows,staffRows,log})} style={{background:"#0369A1",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:13,cursor:"pointer"}}>⬇ Export This View</button>
@@ -1315,7 +1369,6 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
             {clubRows.map(c=>{
               const pct=total?c.value/total:0;
               const isExpanded=expandedClub===c.club;
-              const clubEntries=[...c.entries].sort((a,b)=>b.ts-a.ts);
               return(
                 <Fragment key={c.club}>
                   <tr onClick={()=>setExpandedClub(isExpanded?null:c.club)} style={{cursor:"pointer",background:isExpanded?"#F5F3FF":undefined}}>
@@ -1334,37 +1387,9 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
                   {isExpanded&&(
                     <tr key={`${c.club}-expand`}>
                       <td colSpan={6} style={{padding:"0 0 4px 0",background:"#F8F5FF"}}>
-                        <div style={{padding:"12px 20px 16px 36px"}}>
-                          <div style={{fontSize:11,fontWeight:700,color:"#7C3AED",letterSpacing:.5,marginBottom:10}}>DELIVERABLES LOGGED FOR {c.club.toUpperCase()}</div>
-                          <div style={{background:"#fff",border:"1px solid #DDD6FE",borderRadius:10,overflow:"hidden"}}>
-                            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,fontFamily:"'DM Sans',sans-serif"}}>
-                              <thead>
-                                <tr>
-                                  <th style={{padding:"8px 12px",textAlign:"left",fontWeight:700,fontSize:10,letterSpacing:.5,color:"#7C3AED",background:"#F5F3FF",borderBottom:"1px solid #DDD6FE"}}>Date</th>
-                                  <th style={{padding:"8px 12px",textAlign:"left",fontWeight:700,fontSize:10,letterSpacing:.5,color:"#7C3AED",background:"#F5F3FF",borderBottom:"1px solid #DDD6FE"}}>Staff</th>
-                                  <th style={{padding:"8px 12px",textAlign:"left",fontWeight:700,fontSize:10,letterSpacing:.5,color:"#7C3AED",background:"#F5F3FF",borderBottom:"1px solid #DDD6FE"}}>Deliverable</th>
-                                  <th style={{padding:"8px 12px",textAlign:"left",fontWeight:700,fontSize:10,letterSpacing:.5,color:"#7C3AED",background:"#F5F3FF",borderBottom:"1px solid #DDD6FE"}}>Type</th>
-                                  <th style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontSize:10,letterSpacing:.5,color:"#7C3AED",background:"#F5F3FF",borderBottom:"1px solid #DDD6FE"}}>Rate</th>
-                                  <th style={{padding:"8px 12px",textAlign:"left",fontWeight:700,fontSize:10,letterSpacing:.5,color:"#7C3AED",background:"#F5F3FF",borderBottom:"1px solid #DDD6FE"}}>Notes</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {clubEntries.map((e,i)=>(
-                                  <tr key={e.id} style={{background:i%2?"#FAFAFA":"#fff"}}>
-                                    <td style={{padding:"8px 12px",color:"#6B7280",whiteSpace:"nowrap",borderBottom:"1px solid #F3F4F6"}}>{new Date(e.ts).toLocaleDateString()}</td>
-                                    <td style={{padding:"8px 12px",color:"#374151",fontWeight:600,whiteSpace:"nowrap",borderBottom:"1px solid #F3F4F6"}}>{e.staff}</td>
-                                    <td style={{padding:"8px 12px",color:"#111827",borderBottom:"1px solid #F3F4F6"}}>
-                                      <div style={{display:"flex",alignItems:"center",gap:6}}>{e.name}{e.recurring&&<RecurringBadge/>}</div>
-                                    </td>
-                                    <td style={{padding:"8px 12px",borderBottom:"1px solid #F3F4F6"}}><Badge type={e.type}/></td>
-                                    <td style={{padding:"8px 12px",textAlign:"right",color:"#7C3AED",fontWeight:700,whiteSpace:"nowrap",borderBottom:"1px solid #F3F4F6"}}>{e.rate>0?fmt$(e.rate):"—"}</td>
-                                    <td style={{padding:"8px 12px",color:"#6B7280",borderBottom:"1px solid #F3F4F6"}}>{e.notes||"—"}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
+                        <ExpandPanel heading={`DELIVERABLES LOGGED FOR ${c.club.toUpperCase()}`}>
+                          <LineItemTable entries={c.entries} hide={["club"]}/>
+                        </ExpandPanel>
                       </td>
                     </tr>
                   )}
@@ -1382,15 +1407,32 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
             {leagueRows.map(l=>{
               const pct=total?l.value/total:0;
               const ls=LEAGUE_STYLES[l.league]||LEAGUE_STYLES["League-wide"];
+              const isExpanded=expandedLeague===l.league;
               return(
-                <tr key={l.league}>
-                  <TD bold><LeagueBadge league={l.league}/></TD>
-                  <TD right color="#6B7280">{l.clubCount} clubs</TD>
-                  <TD right>{l.count}</TD>
-                  <TD right><span style={{background:"#EEF2FF",color:"#4338CA",borderRadius:6,padding:"2px 8px",fontSize:12,fontWeight:700}}>{l.indexAvg}</span></TD>
-                  <TD right bold color={ls.color}>{fmt$(l.value)}</TD>
-                  <TD right><div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:8}}><div style={{width:60,height:6,background:"#F3F4F6",borderRadius:99,overflow:"hidden"}}><div style={{width:`${pct*100}%`,height:"100%",background:ls.color,borderRadius:99}}/></div>{(pct*100).toFixed(1)}%</div></TD>
-                </tr>
+                <Fragment key={l.league}>
+                  <tr onClick={()=>setExpandedLeague(isExpanded?null:l.league)} style={{cursor:"pointer",background:isExpanded?"#F5F3FF":undefined}}>
+                    <TD bold>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontSize:10,color:"#9CA3AF",transition:"transform .15s",display:"inline-block",transform:isExpanded?"rotate(90deg)":"rotate(0deg)"}}>▶</span>
+                        <LeagueBadge league={l.league}/>
+                      </div>
+                    </TD>
+                    <TD right color="#6B7280">{l.clubCount} clubs</TD>
+                    <TD right>{l.count}</TD>
+                    <TD right><span style={{background:"#EEF2FF",color:"#4338CA",borderRadius:6,padding:"2px 8px",fontSize:12,fontWeight:700}}>{l.indexAvg}</span></TD>
+                    <TD right bold color={ls.color}>{fmt$(l.value)}</TD>
+                    <TD right><div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:8}}><div style={{width:60,height:6,background:"#F3F4F6",borderRadius:99,overflow:"hidden"}}><div style={{width:`${pct*100}%`,height:"100%",background:ls.color,borderRadius:99}}/></div>{(pct*100).toFixed(1)}%</div></TD>
+                  </tr>
+                  {isExpanded&&(
+                    <tr key={`${l.league}-expand`}>
+                      <td colSpan={6} style={{padding:"0 0 4px 0",background:"#F8F5FF"}}>
+                        <ExpandPanel heading={`DELIVERABLES LOGGED FOR ${l.league.toUpperCase()}`}>
+                          <LineItemTable entries={l.entries} hide={["league"]}/>
+                        </ExpandPanel>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               );
             })}
           </tbody>
@@ -1403,7 +1445,33 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
           <tbody>
             {deptRows.map(d=>{
               const cfg=DEPT_CONFIG[d.dept],pct=total?d.value/total:0;
-              return(<tr key={d.dept}><TD bold><span style={{marginRight:6}}>{cfg?.emoji}</span>{d.dept}</TD><TD right>{d.count}</TD><TD right bold color={cfg?.color||"#374151"}>{fmt$(d.value)}</TD><TD right color="#0369A1">{d.ext}</TD><TD right color="#047857">{d.int}</TD><TD right><div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:8}}><div style={{width:60,height:6,background:"#F3F4F6",borderRadius:99,overflow:"hidden"}}><div style={{width:`${pct*100}%`,height:"100%",background:cfg?.color||"#6366F1",borderRadius:99}}/></div>{(pct*100).toFixed(1)}%</div></TD></tr>);
+              const isExpanded=expandedDept===d.dept;
+              return(
+                <Fragment key={d.dept}>
+                  <tr onClick={()=>setExpandedDept(isExpanded?null:d.dept)} style={{cursor:"pointer",background:isExpanded?"#F5F3FF":undefined}}>
+                    <TD bold>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontSize:10,color:"#9CA3AF",transition:"transform .15s",display:"inline-block",transform:isExpanded?"rotate(90deg)":"rotate(0deg)"}}>▶</span>
+                        <span>{cfg?.emoji}</span>{d.dept}
+                      </div>
+                    </TD>
+                    <TD right>{d.count}</TD>
+                    <TD right bold color={cfg?.color||"#374151"}>{fmt$(d.value)}</TD>
+                    <TD right color="#0369A1">{d.ext}</TD>
+                    <TD right color="#047857">{d.int}</TD>
+                    <TD right><div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:8}}><div style={{width:60,height:6,background:"#F3F4F6",borderRadius:99,overflow:"hidden"}}><div style={{width:`${pct*100}%`,height:"100%",background:cfg?.color||"#6366F1",borderRadius:99}}/></div>{(pct*100).toFixed(1)}%</div></TD>
+                  </tr>
+                  {isExpanded&&(
+                    <tr key={`${d.dept}-expand`}>
+                      <td colSpan={6} style={{padding:"0 0 4px 0",background:"#F8F5FF"}}>
+                        <ExpandPanel heading={`DELIVERABLES LOGGED FOR ${d.dept.toUpperCase()}`}>
+                          <LineItemTable entries={d.entries} hide={["dept"]}/>
+                        </ExpandPanel>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
             })}
           </tbody>
         </TblWrap>
@@ -1416,15 +1484,35 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
             {staffRows.map(s=>{
               const pct=total?s.value/total:0;
               const initials=s.staff.split(" ").map(n=>n[0]).join("").slice(0,2);
-              return(<tr key={s.staff}>
-                <TD bold><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:28,height:28,borderRadius:"50%",background:"#EEF2FF",color:"#4338CA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,flexShrink:0}}>{initials}</div>{s.staff}</div></TD>
-                <TD right>{s.count}</TD>
-                <TD right><span style={{background:"#EEF2FF",color:"#4338CA",borderRadius:6,padding:"2px 8px",fontSize:12,fontWeight:700}}>{s.indexAvg}</span></TD>
-                <TD right bold>{fmt$(s.value)}</TD>
-                <TD right color="#0369A1">{s.ext}</TD>
-                <TD right color="#047857">{s.int}</TD>
-                <TD right><div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:8}}><div style={{width:60,height:6,background:"#F3F4F6",borderRadius:99,overflow:"hidden"}}><div style={{width:`${pct*100}%`,height:"100%",background:"#4338CA",borderRadius:99}}/></div>{(pct*100).toFixed(1)}%</div></TD>
-              </tr>);
+              const isExpanded=expandedStaff===s.staff;
+              return(
+                <Fragment key={s.staff}>
+                  <tr onClick={()=>setExpandedStaff(isExpanded?null:s.staff)} style={{cursor:"pointer",background:isExpanded?"#F5F3FF":undefined}}>
+                    <TD bold>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontSize:10,color:"#9CA3AF",transition:"transform .15s",display:"inline-block",transform:isExpanded?"rotate(90deg)":"rotate(0deg)"}}>▶</span>
+                        <div style={{width:28,height:28,borderRadius:"50%",background:"#EEF2FF",color:"#4338CA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,flexShrink:0}}>{initials}</div>
+                        {s.staff}
+                      </div>
+                    </TD>
+                    <TD right>{s.count}</TD>
+                    <TD right><span style={{background:"#EEF2FF",color:"#4338CA",borderRadius:6,padding:"2px 8px",fontSize:12,fontWeight:700}}>{s.indexAvg}</span></TD>
+                    <TD right bold>{fmt$(s.value)}</TD>
+                    <TD right color="#0369A1">{s.ext}</TD>
+                    <TD right color="#047857">{s.int}</TD>
+                    <TD right><div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:8}}><div style={{width:60,height:6,background:"#F3F4F6",borderRadius:99,overflow:"hidden"}}><div style={{width:`${pct*100}%`,height:"100%",background:"#4338CA",borderRadius:99}}/></div>{(pct*100).toFixed(1)}%</div></TD>
+                  </tr>
+                  {isExpanded&&(
+                    <tr key={`${s.staff}-expand`}>
+                      <td colSpan={7} style={{padding:"0 0 4px 0",background:"#F8F5FF"}}>
+                        <ExpandPanel heading={`DELIVERABLES LOGGED BY ${s.staff.toUpperCase()}`}>
+                          <LineItemTable entries={s.entries} hide={["staff"]}/>
+                        </ExpandPanel>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
             })}
           </tbody>
         </TblWrap>
