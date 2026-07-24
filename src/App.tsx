@@ -977,6 +977,9 @@ function Dashboard({ log, onExport, clubsByLeague }) {
     return true;
   });
 
+  const strategicLog = typeFiltered.filter(e=>!e.recurring);
+  const recurringLog  = typeFiltered.filter(e=>e.recurring);
+
   // League-filtered (for charts that use it)
   const leagueFiltered = league==="all" ? typeFiltered : typeFiltered.filter(e=>e.league===league);
   const externalLog = leagueFiltered.filter(e=>e.type==="External");
