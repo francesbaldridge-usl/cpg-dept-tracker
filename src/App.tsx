@@ -1022,7 +1022,7 @@ function Dashboard({ log, onExport, clubsByLeague }) {
   const recurring = recurringLog.length;
   const extCnt    = typeFiltered.filter(e=>e.type==="External").length;
   const intCnt    = typeFiltered.filter(e=>e.type==="Internal").length;
-  const stratIdx  = typeFiltered.filter(e=>!e.recurring&&e.type==="External"&&e.index_score>0);
+  const stratIdx  = typeFiltered.filter(e=>!e.recurring&&e.type==="External");
   const avgIndex  = stratIdx.length>0?(stratIdx.reduce((s,e)=>s+Number(e.index_score||1),0)/stratIdx.length).toFixed(1):"—";
 
   // Charts
@@ -1292,7 +1292,7 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
     if(!clubMap[c])clubMap[c]={club:c,league:e.league||"",count:0,value:0,indexSum:0,indexCount:0,entries:[]};
     clubMap[c].count++;clubMap[c].value+=e.rate;
     clubMap[c].entries.push(e);
-    if(!e.recurring&&e.index_score){clubMap[c].indexSum+=Number(e.index_score);clubMap[c].indexCount++;}
+    if(!e.recurring){clubMap[c].indexSum+=Number(e.index_score||1);clubMap[c].indexCount++;}
   });
   Object.values(clubMap).forEach(c=>{c.indexAvg=c.indexCount>0?(c.indexSum/c.indexCount).toFixed(1):"—";});
   const clubRows=Object.values(clubMap).sort((a,b)=>b.value-a.value);
@@ -1304,7 +1304,7 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
     if(!leagueMap[l])leagueMap[l]={league:l,count:0,value:0,indexSum:0,indexCount:0,clubs:new Set(),entries:[]};
     leagueMap[l].count++;leagueMap[l].value+=e.rate;leagueMap[l].clubs.add(e.club);
     leagueMap[l].entries.push(e);
-    if(!e.recurring&&e.index_score){leagueMap[l].indexSum+=Number(e.index_score);leagueMap[l].indexCount++;}
+    if(!e.recurring){leagueMap[l].indexSum+=Number(e.index_score||1);leagueMap[l].indexCount++;}
   });
   Object.values(leagueMap).forEach(l=>{l.indexAvg=l.indexCount>0?(l.indexSum/l.indexCount).toFixed(1):"—";l.clubCount=l.clubs.size;});
   const leagueRows=Object.values(leagueMap).sort((a,b)=>b.count-a.count);
@@ -1326,7 +1326,7 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
     staffMap[e.staff].count++;staffMap[e.staff].value+=e.rate;
     staffMap[e.staff].entries.push(e);
     if(e.type==="External")staffMap[e.staff].ext++;else staffMap[e.staff].int++;
-    if(!e.recurring&&e.index_score&&e.type==="External"){staffMap[e.staff].indexSum+=Number(e.index_score);staffMap[e.staff].indexCount++;}
+    if(!e.recurring&&e.type==="External"){staffMap[e.staff].indexSum+=Number(e.index_score||1);staffMap[e.staff].indexCount++;}
   });
   Object.values(staffMap).forEach(s=>{s.indexAvg=s.indexCount>0?(s.indexSum/s.indexCount).toFixed(1):"—";});
   const staffRows=Object.values(staffMap).sort((a,b)=>b.value-a.value);
@@ -1541,7 +1541,7 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
           <TblWrap>
             <thead><tr>
               <th style={{padding:"11px 14px",width:40,background:"#F9FAFB",borderBottom:"1px solid #E5E7EB"}}/>
-              <TH>#</TH><TH>Time</TH><TH>Staff</TH><TH>Dept</TH><TH>Deliverable</TH><TH>Type</TH><TH>Club / Recipient</TH><TH>League</TH><TH right>Rack Rate</TH><TH>Notes</TH>
+              <TH>#</TH><TH>Time</TH><TH>Staff</TH><TH>Dept</TH><TH>Deliverable</TH><TH>Type</TH><TH>Club / Recipient</TH><TH>League</TH><TH right>Rack Rate</TH><TH right>Index</TH><TH>Notes</TH>
             </tr></thead>
             <tbody>
               {reversed.map((e,i)=>{
@@ -1563,6 +1563,7 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
                     <TD color="#374151">{e.club}</TD>
                     <TD><LeagueBadge league={e.league||"League-wide"}/></TD>
                     <TD right bold color={DEPT_CONFIG[e.dept]?.color||"#374151"}>{e.rate>0?fmt$(e.rate):"—"}</TD>
+                    <TD right>{e.index_score>0?<span style={{background:"#EEF2FF",color:"#4338CA",borderRadius:6,padding:"2px 8px",fontSize:12,fontWeight:700}}>{e.index_score}</span>:"—"}</TD>
                     <TD color="#6B7280">{e.notes||"—"}</TD>
                   </tr>
                 );
