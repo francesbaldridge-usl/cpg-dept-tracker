@@ -990,6 +990,7 @@ function Dashboard({ log, onExport, clubsByLeague }) {
   const [filterYear,   setFilterYear]  = useState("all");
   const [filterMonth,  setFilterMonth] = useState("all");
   const [entryType,    setEntryType]   = useState("all");
+  const [scope,        setScope]       = useState("all");
   const [metric,       setMetric]      = useState("index");
   const [showAllClubs, setShowAllClubs]= useState(false);
 
@@ -1010,11 +1011,19 @@ function Dashboard({ log, onExport, clubsByLeague }) {
     if(entryType==="strategic") return !e.recurring;
     if(entryType==="recurring") return e.recurring;
     return true;
+  }).filter(e=>{
+    if(scope==="external") return e.type==="External";
+    if(scope==="internal") return e.type==="Internal";
+    return true;
   });
   const strategicLog = typeFiltered.filter(e=>!e.recurring);
   const recurringLog  = typeFiltered.filter(e=>e.recurring);
   const leagueFiltered = league==="all" ? typeFiltered : typeFiltered.filter(e=>e.league===league);
   const externalLog = leagueFiltered.filter(e=>e.type==="External");
+  // Attribution log: clubs for external work, recipients for internal work — pivots the
+  // "engaged" KPI and Top Clubs/Recipients table based on which scope is selected.
+  const attributionLog = scope==="internal" ? leagueFiltered.filter(e=>e.type==="Internal") : externalLog;
+  const attributionLabel = scope==="internal" ? "Recipients" : "Clubs";
 
   // Stats
   const total     = typeFiltered.length;
@@ -1053,9 +1062,9 @@ function Dashboard({ log, onExport, clubsByLeague }) {
     label:l, value:typeFiltered.filter(e=>e.league===l).length, color:LEAGUE_COLORS[l]
   })).filter(d=>d.value>0);
 
-  // Club map
+  // Club/recipient map — pivots to internal recipients when scope==="internal"
   const clubMap={};
-  externalLog.forEach(e=>{
+  attributionLog.forEach(e=>{
     const c=e.club||"Unknown";
     if(!clubMap[c])clubMap[c]={club:c,league:e.league||"",count:0,value:0,indexSum:0,indexCount:0};
     clubMap[c].count++;
@@ -1132,6 +1141,13 @@ function Dashboard({ log, onExport, clubsByLeague }) {
             </button>
           ))}
           <div style={{width:1,height:16,background:"#0a2d6e",margin:"0 6px"}}/>
+          <span style={{fontSize:9,fontWeight:700,letterSpacing:1.2,color:"#4a6fa8",flexShrink:0}}>SCOPE</span>
+          {[["all","All"],["external","External"],["internal","Internal"]].map(([v,l])=>(
+            <button key={v} onClick={()=>setScope(v)} style={{padding:"6px 14px",border:`1.5px solid ${scope===v?"#f51200":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:scope===v?700:400,fontSize:12,cursor:"pointer",background:scope===v?"#f51200":"transparent",color:scope===v?"#fff":"#64748B",transition:"all .15s"}}>
+              {l}
+            </button>
+          ))}
+          <div style={{width:1,height:16,background:"#0a2d6e",margin:"0 6px"}}/>
           <span style={{fontSize:9,fontWeight:700,letterSpacing:1.2,color:"#4a6fa8",flexShrink:0}}>METRIC</span>
           {[["index","CPG Index"],["value","Value Delivered"]].map(([v,l])=>(
             <button key={v} onClick={()=>setMetric(v)} style={{padding:"6px 14px",border:`1.5px solid ${metric===v?"#f51200":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:metric===v?700:400,fontSize:12,cursor:"pointer",background:metric===v?"#f51200":"transparent",color:metric===v?"#fff":"#64748B",transition:"all .15s"}}>
@@ -1150,20 +1166,22 @@ function Dashboard({ log, onExport, clubsByLeague }) {
         const totalValue=typeFiltered.reduce((s,e)=>s+getRackRate(e),0);
         const stratValue=strategicLog.reduce((s,e)=>s+getRackRate(e),0);
         const recurValue=recurringLog.reduce((s,e)=>s+getRackRate(e),0);
-        const extValue=typeFiltered.filter(e=>e.type==="External").reduce((s,e)=>s+getRackRate(e),0);
         const isValue=metric==="value";
+        const engagedCount=Object.keys(clubMap).length;
+        const avgValuePerEntity=engagedCount>0?Math.round(totalValue/engagedCount):0;
+        const scopeNoun = scope==="internal" ? "recipient" : "club";
         const kpis=isValue?[
           {label:"TOTAL VALUE DELIVERED",value:"$"+Math.round(totalValue).toLocaleString(),color:"#111827",sub:`${total} deliverables`},
           {label:"STRATEGIC VALUE",value:"$"+Math.round(stratValue).toLocaleString(),color:"#4338CA",sub:`${strategic} deliverables`},
           {label:"RECURRING VALUE",value:"$"+Math.round(recurValue).toLocaleString(),color:"#854D0E",sub:`${recurring} deliverables`},
-          {label:"EXT VALUE DELIVERED",value:"$"+Math.round(extValue).toLocaleString(),color:"#0369A1",sub:`${extCnt} external entries`},
-          {label:"CLUBS ENGAGED",value:Object.keys(clubMap).length.toLocaleString(),color:"#047857",sub:league==="all"?"all leagues":league},
+          {label:`AVG VALUE PER ${scopeNoun.toUpperCase()}`,value:engagedCount>0?"$"+avgValuePerEntity.toLocaleString():"—",color:"#0369A1",sub:`${engagedCount} ${scopeNoun}${engagedCount===1?"":"s"} engaged`},
+          {label:`${attributionLabel.toUpperCase()} ENGAGED`,value:engagedCount.toLocaleString(),color:"#047857",sub:league==="all"?"all leagues":league},
         ]:[
           {label:"TOTAL DELIVERABLES",value:total.toLocaleString(),color:"#111827",sub:`${extCnt} external · ${intCnt} internal`},
           {label:"STRATEGIC",value:strategic.toLocaleString(),color:"#4338CA",sub:`${total?Math.round(strategic/total*100):0}% of total`},
           {label:"RECURRING",value:recurring.toLocaleString(),color:"#854D0E",sub:`${total?Math.round(recurring/total*100):0}% of total`},
           {label:"AVG CPG INDEX",value:avgIndex,color:"#047857",sub:"strategic external"},
-          {label:"CLUBS ENGAGED",value:Object.keys(clubMap).length.toLocaleString(),color:"#0369A1",sub:league==="all"?"all leagues":league},
+          {label:`${attributionLabel.toUpperCase()} ENGAGED`,value:engagedCount.toLocaleString(),color:"#0369A1",sub:league==="all"?"all leagues":league},
         ];
         return(
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12}}>
@@ -1211,13 +1229,13 @@ function Dashboard({ log, onExport, clubsByLeague }) {
           <div style={{textAlign:"center",padding:"32px 0",color:"#9CA3AF",fontSize:13}}>No data for this filter.</div>}
       </Card>
 
-      {/* Row 3: Top Clubs */}
+      {/* Row 3: Top Clubs / Recipients */}
       <Card
-        title={`Top Clubs — ${metric==="value"?"Value Delivered":"CPG Index Score"}`}
+        title={`Top ${attributionLabel} — ${metric==="value"?"Value Delivered":"CPG Index Score"}`}
         action={metric==="value"&&<span style={{fontSize:11,color:"#F59E0B",background:"#FEF9C3",border:"1px solid #FDE68A",borderRadius:6,padding:"2px 8px",fontWeight:600}}>Conservative est. rates</span>}
       >
         {clubRows.length===0?(
-          <div style={{textAlign:"center",padding:"32px 0",color:"#9CA3AF",fontSize:13}}>No external entries for this filter.</div>
+          <div style={{textAlign:"center",padding:"32px 0",color:"#9CA3AF",fontSize:13}}>No {scope==="internal"?"internal":"external"} entries for this filter.</div>
         ):(
           <>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
