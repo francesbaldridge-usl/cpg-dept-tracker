@@ -351,6 +351,7 @@ function LineItemTable({ entries, hide=[] }) {
     { key:"club",  label:"Club / Recipient",  render:e=>e.club },
     { key:"league",label:"League",            render:e=><LeagueBadge league={e.league||"League-wide"}/> },
     { key:"rate",  label:"Rate",   right:true,render:e=>e.rate>0?fmt$(e.rate):"—" },
+    { key:"index", label:"Index",  right:true,render:e=>e.index_score>0?<span style={{background:"#EEF2FF",color:"#4338CA",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700}}>{e.index_score}</span>:"—" },
     { key:"notes", label:"Notes",             render:e=>e.notes||"—" },
   ];
   const cols = ALL_COLS.filter(c=>!hide.includes(c.key));
