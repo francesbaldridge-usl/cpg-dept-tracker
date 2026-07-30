@@ -1031,18 +1031,16 @@ function Dashboard({ log, onExport, clubsByLeague }) {
     const leagueEntries = typeFiltered.filter(e=>e.league===l);
     const externalLeagueEntries = leagueEntries.filter(e=>e.type==="External");
     const leagueClubs = new Set(externalLeagueEntries.map(e=>e.club));
-    let sub = "";
-    if (leagueClubs.size>0) {
-      if (metric==="value") {
-        const totalVal = leagueEntries.reduce((s,e)=>s+getRackRate(e),0);
-        sub = `(avg ${fmt$(Math.round(totalVal/leagueClubs.size))})`;
-      } else {
-        const stratExt = externalLeagueEntries.filter(e=>!e.recurring);
-        if (stratExt.length>0) {
-          const avgIdx = (stratExt.reduce((s,e)=>s+Number(e.index_score||1),0)/leagueClubs.size).toFixed(1);
-          sub = `(avg ${avgIdx})`;
-        }
-      }
+    const clubDivisor = leagueClubs.size || 1;
+    let sub;
+    if (metric==="value") {
+      const totalVal = leagueEntries.reduce((s,e)=>s+getRackRate(e),0);
+      sub = leagueClubs.size>0 ? `(avg ${fmt$(Math.round(totalVal/clubDivisor))})` : "(avg —)";
+    } else {
+      const stratExt = externalLeagueEntries.filter(e=>!e.recurring);
+      sub = (leagueClubs.size>0 && stratExt.length>0)
+        ? `(avg ${(stratExt.reduce((s,e)=>s+Number(e.index_score||1),0)/clubDivisor).toFixed(1)})`
+        : "(avg —)";
     }
     return { label:l, value:leagueEntries.length, color:LEAGUE_COLORS[l], sub };
   }).filter(d=>d.value>0);
@@ -1182,7 +1180,22 @@ function Dashboard({ log, onExport, clubsByLeague }) {
 
       {/* Row 1: Bar + Pie */}
       <div style={{display:"grid",gridTemplateColumns:"1.4fr 1fr",gap:16}}>
-        <Card title="Total Deliverables by League">
+        <Card title={(()=>{
+          const allExternal = typeFiltered.filter(e=>e.type==="External");
+          const allClubs = new Set(allExternal.map(e=>e.club));
+          const divisor = allClubs.size || 1;
+          let macroSub = "avg —";
+          if (allClubs.size>0) {
+            if (metric==="value") {
+              const totalVal = typeFiltered.reduce((s,e)=>s+getRackRate(e),0);
+              macroSub = `avg ${fmt$(Math.round(totalVal/divisor))}`;
+            } else {
+              const stratExt = allExternal.filter(e=>!e.recurring);
+              if (stratExt.length>0) macroSub = `avg ${(stratExt.reduce((s,e)=>s+Number(e.index_score||1),0)/divisor).toFixed(1)}`;
+            }
+          }
+          return <span>Total Deliverables by League <span style={{fontSize:13,fontWeight:400,color:"#9CA3AF"}}>({macroSub} per club)</span></span>;
+        })()}>
           {byLeague.length>0?<HBarChart data={byLeague} color="#1D4ED8" height={52}/>:
             <div style={{textAlign:"center",padding:"32px 0",color:"#9CA3AF",fontSize:13}}>No data for this filter.</div>}
         </Card>
