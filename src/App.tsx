@@ -910,7 +910,7 @@ function HBarChart({ data, color, valueLabel, height=56 }) {
               <div style={{width:`${pct}%`,height:"100%",background:barColor,borderRadius:8,opacity:isH?1:.82,transition:"all .3s",boxShadow:isH?`0 2px 12px ${barColor}66`:"none"}}/>
             </div>
             <div style={{width:80,flexShrink:0,fontFamily:"'DM Serif Display',serif",fontSize:20,fontWeight:800,color:barColor}}>{d.value.toLocaleString()}</div>
-            {d.sub && <div style={{width:60,flexShrink:0,fontSize:11,color:"#9CA3AF",fontFamily:"'DM Sans',sans-serif"}}>{d.sub}</div>}
+            {d.sub && <div style={{width:90,flexShrink:0,fontSize:11,color:"#9CA3AF",fontFamily:"'DM Sans',sans-serif",whiteSpace:"nowrap"}}>{d.sub}</div>}
           </div>
         );
       })}
@@ -1023,12 +1023,29 @@ function Dashboard({ log, onExport, clubsByLeague }) {
   const extCnt    = typeFiltered.filter(e=>e.type==="External").length;
   const intCnt    = typeFiltered.filter(e=>e.type==="Internal").length;
   const stratIdx  = typeFiltered.filter(e=>!e.recurring&&e.type==="External");
-  const avgIndex  = stratIdx.length>0?(stratIdx.reduce((s,e)=>s+Number(e.index_score||1),0)/stratIdx.length).toFixed(1):"—";
+  const stratClubCount = new Set(stratIdx.map(e=>e.club)).size;
+  const avgIndex  = stratClubCount>0?(stratIdx.reduce((s,e)=>s+Number(e.index_score||1),0)/stratClubCount).toFixed(1):"—";
 
   // Charts
-  const byLeague = ["Championship","League One","Super League","Expansion"].map(l=>({
-    label:l, value:typeFiltered.filter(e=>e.league===l).length, color:LEAGUE_COLORS[l]
-  })).filter(d=>d.value>0);
+  const byLeague = ["Championship","League One","Super League","Expansion"].map(l=>{
+    const leagueEntries = typeFiltered.filter(e=>e.league===l);
+    const externalLeagueEntries = leagueEntries.filter(e=>e.type==="External");
+    const leagueClubs = new Set(externalLeagueEntries.map(e=>e.club));
+    let sub = "";
+    if (leagueClubs.size>0) {
+      if (metric==="value") {
+        const totalVal = leagueEntries.reduce((s,e)=>s+getRackRate(e),0);
+        sub = `(avg ${fmt$(Math.round(totalVal/leagueClubs.size))})`;
+      } else {
+        const stratExt = externalLeagueEntries.filter(e=>!e.recurring);
+        if (stratExt.length>0) {
+          const avgIdx = (stratExt.reduce((s,e)=>s+Number(e.index_score||1),0)/leagueClubs.size).toFixed(1);
+          sub = `(avg ${avgIdx})`;
+        }
+      }
+    }
+    return { label:l, value:leagueEntries.length, color:LEAGUE_COLORS[l], sub };
+  }).filter(d=>d.value>0);
 
   const deptCounts = {};
   leagueFiltered.forEach(e=>{ const k=e.dept||"General"; deptCounts[k]=(deptCounts[k]||0)+1; });
@@ -1838,7 +1855,7 @@ export default function App() {
               Loading…
             </div>
           ):(
-            <div style={{maxWidth:1200,padding:"28px 28px"}}>
+            <div style={{maxWidth:"100%",padding:"28px 40px"}}>
               {activeTab==="Dashboard"         &&<Dashboard log={log} onExport={()=>exportExcel(log)} clubsByLeague={clubsByLeague}/>}
               {activeTab==="Activity Explorer" &&<ActivityExplorer log={log} onRemove={handleRemove} onExportView={exportView}/>}
               {ALL_DEPT_NAMES.includes(activeTab)&&<DeptTab dept={activeTab} log={log} onLog={handleLog} onBulkLog={handleBulkLog} onBulkComplete={handleBulkComplete} deptItems={deptItems} clubsByLeague={clubsByLeague}/>}
