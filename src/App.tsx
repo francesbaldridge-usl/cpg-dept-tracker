@@ -7,7 +7,7 @@ import * as XLSX from "xlsx";
 // ─────────────────────────────────────────────────────────────────────────────
 
 const APP_PASSWORD = "USLsoccer1";
-const SCRIPT_URL   = "https://script.google.com/macros/s/AKfycbwm-cshWQgT-cz9CJaNg6lP85TKjZ0epS22Ucn_rvGSo7yT_feFvzLEBJpXE0Z_y4rhGw/exec";
+const SCRIPT_URL   = "https://script.google.com/macros/s/AKfycbzOLmVlucUFx23aC-11rEioSC23FFVDnJwAc8mHColhOdHn1k68tvWJ7BRtIupX0Qi2DQ/exec";
 
 async function dbFetch() {
   const res = await fetch(`${SCRIPT_URL}?action=fetch`, { method:"GET", redirect:"follow" });
