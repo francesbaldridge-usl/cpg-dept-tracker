@@ -112,6 +112,15 @@ function buildClubsByLeague(clubsData) {
   return result;
 }
 
+function buildClubClusters(clubsData) {
+  const result = {};
+  clubsData.forEach(c => {
+    const cluster = String(c.cluster||"").trim();
+    if (c.club && cluster) result[c.club] = cluster;
+  });
+  return result;
+}
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  FALLBACK DELIVERABLES (used when sheet fetch fails or returns empty)
@@ -1142,8 +1151,9 @@ function DonutChart({ slices, size=220, title, subtitle }) {
 //  DASHBOARD
 // ─────────────────────────────────────────────────────────────────────────────
 
-function Dashboard({ log, onExport, clubsByLeague }) {
+function Dashboard({ log, onExport, clubsByLeague, clubClusters }) {
   const [league,       setLeague]      = useState("all");
+  const [cluster,      setCluster]     = useState("all");
   const [filterYear,   setFilterYear]  = useState("all");
   const [filterMonth,  setFilterMonth] = useState("all");
   const [entryType,    setEntryType]   = useState("all");
@@ -1173,28 +1183,37 @@ function Dashboard({ log, onExport, clubsByLeague }) {
     if(scope==="internal") return e.type==="Internal";
     return true;
   });
-  const strategicLog = typeFiltered.filter(e=>!e.recurring);
-  const recurringLog  = typeFiltered.filter(e=>e.recurring);
-  const leagueFiltered = league==="all" ? typeFiltered : typeFiltered.filter(e=>e.league===league);
+  // Cluster narrows by club, independent of league — lets "all Cluster 1 clubs across leagues"
+  // and "Championship Cluster 1 only" both work depending on whether League is also set.
+  const clusterFiltered = cluster==="all" ? typeFiltered : typeFiltered.filter(e=>clubClusters[e.club]===cluster);
+  // leagueFiltered is the fully-combined set (time + type + scope + cluster + league) and is
+  // the base for every KPI/table below — everything filters together, as it should.
+  const leagueFiltered = league==="all" ? clusterFiltered : clusterFiltered.filter(e=>e.league===league);
+  const strategicLog = leagueFiltered.filter(e=>!e.recurring);
+  const recurringLog  = leagueFiltered.filter(e=>e.recurring);
   const externalLog = leagueFiltered.filter(e=>e.type==="External");
   // Attribution log: clubs for external work, recipients for internal work — pivots the
   // "engaged" KPI and Top Clubs/Recipients table based on which scope is selected.
   const attributionLog = scope==="internal" ? leagueFiltered.filter(e=>e.type==="Internal") : externalLog;
   const attributionLabel = scope==="internal" ? "Recipients" : "Clubs";
+  const clusterList = [...new Set(Object.values(clubClusters))].filter(Boolean).sort();
+  const resetFilters = () => { setLeague("all"); setCluster("all"); setFilterYear("all"); setFilterMonth("all"); setEntryType("all"); setScope("all"); setMetric("index"); };
 
   // Stats
-  const total     = typeFiltered.length;
+  const total     = leagueFiltered.length;
   const strategic = strategicLog.length;
   const recurring = recurringLog.length;
-  const extCnt    = typeFiltered.filter(e=>e.type==="External").length;
-  const intCnt    = typeFiltered.filter(e=>e.type==="Internal").length;
-  const stratIdx  = typeFiltered.filter(e=>!e.recurring&&e.type==="External");
+  const extCnt    = leagueFiltered.filter(e=>e.type==="External").length;
+  const intCnt    = leagueFiltered.filter(e=>e.type==="Internal").length;
+  const stratIdx  = leagueFiltered.filter(e=>!e.recurring&&e.type==="External");
   const stratClubCount = new Set(stratIdx.map(e=>e.club)).size;
   const avgIndex  = stratClubCount>0?(stratIdx.reduce((s,e)=>s+Number(e.index_score||1),0)/stratClubCount).toFixed(1):"—";
 
-  // Charts
+  // Charts — by-league breakdowns intentionally use clusterFiltered (not leagueFiltered) so
+  // selecting a single league doesn't collapse these into a trivial one-bar chart; they still
+  // respect Cluster, Type, and Scope, just not the League toggle itself.
   const byLeague = ["Championship","League One","Super League","Expansion"].map(l=>{
-    const leagueEntries = typeFiltered.filter(e=>e.league===l);
+    const leagueEntries = clusterFiltered.filter(e=>e.league===l);
     const externalLeagueEntries = leagueEntries.filter(e=>e.type==="External");
     const leagueClubs = new Set(externalLeagueEntries.map(e=>e.club));
     const clubDivisor = leagueClubs.size || 1;
@@ -1216,7 +1235,7 @@ function Dashboard({ log, onExport, clubsByLeague }) {
   const byDept = Object.entries(deptCounts).sort((a,b)=>b[1]-a[1]).map(([dept,count])=>({label:dept,value:count,color:DEPT_COLORS[dept]||"#475569"}));
 
   const usageByLeague = ["Championship","League One","Super League","Expansion"].map(l=>({
-    label:l, value:typeFiltered.filter(e=>e.league===l).length, color:LEAGUE_COLORS[l]
+    label:l, value:clusterFiltered.filter(e=>e.league===l).length, color:LEAGUE_COLORS[l]
   })).filter(d=>d.value>0);
 
   // Club/recipient map — pivots to internal recipients when scope==="internal"
@@ -1265,7 +1284,21 @@ function Dashboard({ log, onExport, clubsByLeague }) {
               {l==="all"?"All Leagues":l}
             </button>
           ))}
+          <button onClick={resetFilters} style={{marginLeft:"auto",padding:"6px 14px",border:"1.5px solid #0a2d6e",borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:12,cursor:"pointer",background:"transparent",color:"#F87171",transition:"all .15s",whiteSpace:"nowrap"}}>↺ Reset Filters</button>
         </div>
+
+        {clusterList.length>0&&(<>
+        <div style={{height:1,background:"#0a2d6e"}}/>
+        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+          <span style={{fontSize:9,fontWeight:700,letterSpacing:1.2,color:"#4a6fa8",width:52,flexShrink:0}}>CLUSTER</span>
+          <button onClick={()=>setCluster("all")} style={{padding:"6px 14px",border:`1.5px solid ${cluster==="all"?"#fff":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:cluster==="all"?700:400,fontSize:12,cursor:"pointer",background:cluster==="all"?"#fff":"transparent",color:cluster==="all"?"#011e5c":"#64748B",transition:"all .15s",whiteSpace:"nowrap"}}>All Clusters</button>
+          {clusterList.map(c=>(
+            <button key={c} onClick={()=>setCluster(c)} style={{padding:"6px 14px",border:`1.5px solid ${cluster===c?"#fff":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:cluster===c?700:400,fontSize:12,cursor:"pointer",background:cluster===c?"#fff":"transparent",color:cluster===c?"#011e5c":"#64748B",transition:"all .15s",whiteSpace:"nowrap"}}>
+              {c}
+            </button>
+          ))}
+        </div>
+        </>)}
 
         <div style={{height:1,background:"#0a2d6e"}}/>
 
@@ -1320,7 +1353,7 @@ function Dashboard({ log, onExport, clubsByLeague }) {
 
       {/* KPI Cards */}
       {(()=>{
-        const totalValue=typeFiltered.reduce((s,e)=>s+getRackRate(e),0);
+        const totalValue=leagueFiltered.reduce((s,e)=>s+getRackRate(e),0);
         const stratValue=strategicLog.reduce((s,e)=>s+getRackRate(e),0);
         const recurValue=recurringLog.reduce((s,e)=>s+getRackRate(e),0);
         const isValue=metric==="value";
@@ -1356,13 +1389,13 @@ function Dashboard({ log, onExport, clubsByLeague }) {
       {/* Row 1: Bar + Pie */}
       <div style={{display:"grid",gridTemplateColumns:"1.4fr 1fr",gap:16}}>
         <Card title={(()=>{
-          const allExternal = typeFiltered.filter(e=>e.type==="External");
+          const allExternal = clusterFiltered.filter(e=>e.type==="External");
           const allClubs = new Set(allExternal.map(e=>e.club));
           const divisor = allClubs.size || 1;
           let macroSub = "avg —";
           if (allClubs.size>0) {
             if (metric==="value") {
-              const totalVal = typeFiltered.reduce((s,e)=>s+getRackRate(e),0);
+              const totalVal = clusterFiltered.reduce((s,e)=>s+getRackRate(e),0);
               macroSub = `avg ${fmt$(Math.round(totalVal/divisor))}`;
             } else {
               const stratExt = allExternal.filter(e=>!e.recurring);
@@ -1432,7 +1465,7 @@ function Dashboard({ log, onExport, clubsByLeague }) {
       <Card title="Internal vs. External Workload by Department">
         {(()=>{
           const deptIntExt=ALL_DEPT_NAMES.map(dept=>{
-            const en=typeFiltered.filter(e=>e.dept===dept);
+            const en=leagueFiltered.filter(e=>e.dept===dept);
             return{dept,ext:en.filter(e=>e.type==="External").length,int:en.filter(e=>e.type==="Internal").length,total:en.length};
           }).filter(d=>d.total>0&&DEPT_CONFIG[d.dept]);
           if(!deptIntExt.length) return <div style={{textAlign:"center",padding:"24px 0",color:"#9CA3AF",fontSize:13}}>No data.</div>;
@@ -1962,6 +1995,7 @@ export default function App() {
   const [log,           setLog]           = useState([]);
   const [deptItems,     setDeptItems]     = useState(FALLBACK_DEPT_ITEMS);
   const [clubsByLeague, setClubsByLeague] = useState(FALLBACK_CLUBS);
+  const [clubClusters,  setClubClusters]  = useState({});
   const [loading,       setLoading]       = useState(true);
   const [toast,         setToast]         = useState(null);
 
@@ -1981,7 +2015,7 @@ export default function App() {
       } else {
         setDeptItems(FALLBACK_DEPT_ITEMS);
       }
-      if(clubData.length)  setClubsByLeague(buildClubsByLeague(clubData));
+      if(clubData.length) { setClubsByLeague(buildClubsByLeague(clubData)); setClubClusters(buildClubClusters(clubData)); }
     }catch(e){console.error("Load error:",e);}
     finally{setLoading(false);}
   },[]);
@@ -2047,7 +2081,7 @@ export default function App() {
             </div>
           ):(
             <div style={{maxWidth:"100%",padding:"28px 40px"}}>
-              {activeTab==="Dashboard"         &&<Dashboard log={log} onExport={()=>exportExcel(log)} clubsByLeague={clubsByLeague}/>}
+              {activeTab==="Dashboard"         &&<Dashboard log={log} onExport={()=>exportExcel(log)} clubsByLeague={clubsByLeague} clubClusters={clubClusters}/>}
               {activeTab==="Activity Explorer" &&<ActivityExplorer log={log} onRemove={handleRemove} onExportView={exportView}/>}
               {ALL_DEPT_NAMES.includes(activeTab)&&<DeptTab dept={activeTab} log={log} onLog={handleLog} onBulkLog={handleBulkLog} onBulkComplete={handleBulkComplete} deptItems={deptItems} clubsByLeague={clubsByLeague}/>}
             </div>
