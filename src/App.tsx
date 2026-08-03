@@ -203,30 +203,59 @@ const FALLBACK_DEPT_ITEMS = {
   },
 };
 
+// Normalize the flat fallback items into the same {name,cat,leagueSelect,subcategories:[...]}
+// shape buildDeptItems() produces, so DeptTab/CategoryGroupedCards never have to branch on source.
+(function normalizeFallback(){
+  Object.values(FALLBACK_DEPT_ITEMS).forEach(dept=>{
+    ["external","internal"].forEach(mode=>{
+      if (!dept[mode]) return;
+      dept[mode] = dept[mode].map(item=>({
+        name: item.name,
+        cat: item.cat,
+        leagueSelect: !!item.leagueSelect,
+        subcategories: [{
+          subcat: item.name,
+          rate: item.rate,
+          index_score: item.index_score,
+          recurring: item.recurring,
+          examples: item.examples||[],
+        }],
+      }));
+    });
+  });
+})();
+
 function buildDeptItems(deliverables) {
   const map = {};
   deliverables.forEach(d => {
     const dept = normalizeDept(d.dept);
     if (!dept || !DEPT_CONFIG[dept]) return;
-    if (!map[dept]) map[dept] = { external:[], internal:[] };
+    const name = String(d.name||"").trim();
+    if (!name) return;
+    if (!map[dept]) map[dept] = { external:{}, internal:{} };
     const isRecurring = String(d.recurring||"").toLowerCase() === "true";
-    const item = {
-      name:        String(d.name||"").trim(),
+    const cat = String(d.cat||d.category||"Other").trim();
+    const leagueSelect = name==="Social Media Report" && dept==="Marketing";
+    const subEntry = {
+      subcat:      String(d.subcat||"").trim() || name,
       rate:        Number(d.rate)||0,
-      cat:         String(d.cat||d.category||"Other").trim(),
       index_score: Number(d.index_score)||1,
       recurring:   isRecurring,
       examples:    d.examples ? String(d.examples).split(";").map(e=>e.trim()).filter(Boolean) : [],
-      leagueSelect: String(d.name||"").trim()==="Social Media Report" && dept==="Marketing",
     };
-    if (!item.name) return;
     const t = String(d.type||d["type (internal or external)"]||"").toLowerCase().trim();
     const isBoth = t.includes("external") && t.includes("internal");
-    if (isBoth) { map[dept].external.push(item); map[dept].internal.push({...item}); }
-    else if (t==="internal") { map[dept].internal.push(item); }
-    else { map[dept].external.push(item); }
+    const modes = isBoth ? ["external","internal"] : (t==="internal" ? ["internal"] : ["external"]);
+    modes.forEach(mode=>{
+      if (!map[dept][mode][name]) map[dept][mode][name] = { name, cat, leagueSelect, subcategories:[] };
+      map[dept][mode][name].subcategories.push({...subEntry});
+    });
   });
-  return map;
+  const result = {};
+  Object.entries(map).forEach(([dept,modes])=>{
+    result[dept] = { external: Object.values(modes.external), internal: Object.values(modes.internal) };
+  });
+  return result;
 }
 
 function leagueForClub(club, cbl) {
@@ -348,7 +377,7 @@ function LineItemTable({ entries, hide=[] }) {
     { key:"date",  label:"Date",              render:e=>new Date(e.ts).toLocaleDateString() },
     { key:"staff", label:"Staff",             render:e=>e.staff },
     { key:"dept",  label:"Dept",              render:e=><DeptChip dept={e.dept}/> },
-    { key:"name",  label:"Deliverable",       render:e=><div style={{display:"flex",alignItems:"center",gap:6}}>{e.name}{e.recurring&&<RecurringBadge/>}</div> },
+    { key:"name",  label:"Deliverable",       render:e=><div><div style={{display:"flex",alignItems:"center",gap:6}}>{e.name}{e.recurring&&<RecurringBadge/>}</div>{e.subcat&&e.subcat!==e.name&&<div style={{fontSize:11,color:"#9CA3AF",marginTop:2}}>{e.subcat}</div>}</div> },
     { key:"type",  label:"Type",              render:e=><Badge type={e.type}/> },
     { key:"club",  label:"Club / Recipient",  render:e=>e.club },
     { key:"league",label:"League",            render:e=><LeagueBadge league={e.league||"League-wide"}/> },
@@ -609,6 +638,37 @@ function InternalModal({ item, deptCfg, dept, clubsByLeague, onConfirm, onCancel
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  SUBCATEGORY PICKER — shown when an item has more than one priced subcategory
+// ─────────────────────────────────────────────────────────────────────────────
+
+function SubcategoryPickerModal({ item, deptCfg, onSelect, onCancel }) {
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,.55)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div style={{background:"#fff",borderRadius:16,padding:"28px 28px 24px",width:"100%",maxWidth:440,boxShadow:"0 24px 64px rgba(0,0,0,.22)",fontFamily:"'DM Sans',sans-serif",maxHeight:"90vh",overflowY:"auto"}}>
+        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:19,color:"#111827",marginBottom:4}}>{item.name}</div>
+        <div style={{fontSize:13,color:"#6B7280",marginBottom:20}}>Select the specific type to log</div>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {item.subcategories.map((s,i)=>(
+            <div key={i} onClick={()=>onSelect(s)} style={{border:"2px solid #E5E7EB",borderRadius:10,padding:"12px 14px",cursor:"pointer",background:"#fff",transition:"border-color .15s"}}
+              onMouseEnter={e=>e.currentTarget.style.borderColor=deptCfg.color} onMouseLeave={e=>e.currentTarget.style.borderColor="#E5E7EB"}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+                <span style={{fontWeight:700,fontSize:14,color:"#111827"}}>{s.subcat}</span>
+                {s.recurring&&<RecurringBadge/>}
+              </div>
+              <div style={{fontSize:12,color:"#6B7280",marginTop:4}}>
+                {s.rate>0&&<strong style={{color:"#374151"}}>{fmt$(s.rate)}</strong>}
+                <span style={{marginLeft:8,fontSize:11,background:"#F3F4F6",borderRadius:6,padding:"1px 7px",color:"#475569"}}>Index {s.index_score}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <button onClick={onCancel} style={{marginTop:16,width:"100%",padding:"11px 18px",border:"1.5px solid #E5E7EB",borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:600,fontSize:14,color:"#6B7280",background:"#fff",cursor:"pointer"}}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  CATEGORY GROUPED CARDS
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -645,22 +705,37 @@ function CategoryGroupedCards({ items, log, dept, cfg, pulsingIdx, onLogClick })
                 {entries.map(({item,idx})=>{
                   const count=log.filter(e=>e.dept===dept&&e.name===item.name).length;
                   const isPulsing=pulsingIdx===idx;
+                  const subs=item.subcategories||[];
+                  const multi=subs.length>1;
+                  const rates=subs.map(s=>s.rate).filter(r=>r>0);
+                  const rateDisplay = rates.length===0 ? null
+                    : !multi ? fmt$(subs[0].rate)
+                    : (Math.min(...rates)===Math.max(...rates) ? fmt$(rates[0]) : `From ${fmt$(Math.min(...rates))}`);
+                  const idxVals=subs.map(s=>s.index_score);
+                  const indexDisplay = !multi ? subs[0]?.index_score
+                    : (Math.min(...idxVals)===Math.max(...idxVals) ? idxVals[0] : `${Math.min(...idxVals)}–${Math.max(...idxVals)}`);
+                  const allRecurring = subs.length>0 && subs.every(s=>s.recurring);
+                  const teaser = multi
+                    ? subs.map(s=>s.subcat).join(" · ")
+                    : (subs[0]?.examples||[]).slice(0,4).join(" · ");
+                  const teaserExtra = multi ? 0 : Math.max(0,(subs[0]?.examples?.length||0)-4);
                   return(
                     <div key={item.name} style={{background:"#fff",border:`1.5px solid ${isPulsing?cfg.color:"#E5E7EB"}`,borderRadius:12,padding:16,display:"flex",flexDirection:"column",gap:8,boxShadow:isPulsing?`0 0 0 4px ${cfg.color}33`:"0 1px 4px rgba(0,0,0,.06)",transition:"border-color .2s,box-shadow .2s"}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
                         <span style={{fontFamily:"'DM Serif Display',serif",fontSize:15,color:"#111827",lineHeight:1.3,flex:1}}>{item.name}</span>
-                        {item.recurring&&<RecurringBadge/>}
+                        {allRecurring&&<RecurringBadge/>}
                       </div>
-                      {item.examples&&item.examples.length>0&&(
-                        <div style={{fontSize:11,color:"#6B7280",fontStyle:"italic",lineHeight:1.5}}>
-                          {item.examples.slice(0,4).join(" · ")}
-                          {item.examples.length>4&&<span style={{color:cfg.color,fontStyle:"normal",fontWeight:600,marginLeft:4}}>+{item.examples.length-4} more</span>}
+                      {teaser&&(
+                        <div style={{fontSize:11,color:"#6B7280",fontStyle:multi?"normal":"italic",lineHeight:1.5}}>
+                          {teaser}
+                          {teaserExtra>0&&<span style={{color:cfg.color,fontStyle:"normal",fontWeight:600,marginLeft:4}}>+{teaserExtra} more</span>}
                         </div>
                       )}
                       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:2}}>
                         <span style={{fontSize:13,color:"#6B7280"}}>
-                          {item.rate>0&&<strong style={{color:"#374151"}}>{fmt$(item.rate)}</strong>}
-                          <span style={{marginLeft:8,fontSize:11,background:"#F3F4F6",borderRadius:6,padding:"1px 7px",color:"#475569"}}>Index {item.index_score}</span>
+                          {rateDisplay&&<strong style={{color:"#374151"}}>{rateDisplay}</strong>}
+                          {indexDisplay!=null&&<span style={{marginLeft:8,fontSize:11,background:"#F3F4F6",borderRadius:6,padding:"1px 7px",color:"#475569"}}>Index {indexDisplay}</span>}
+                          {multi&&<span style={{marginLeft:8,fontSize:11,background:cfg.light,color:cfg.color,borderRadius:6,padding:"1px 7px",fontWeight:600}}>{subs.length} types</span>}
                         </span>
                         <div style={{display:"flex",alignItems:"center",gap:8}}>
                           {count>0&&<span style={{background:cfg.light,color:cfg.color,border:`1px solid ${cfg.border}`,borderRadius:20,padding:"2px 10px",fontWeight:700,fontSize:13}}>×{count}</span>}
@@ -689,6 +764,8 @@ function DeptTab({ dept, log, onLog, onBulkLog, onBulkComplete, deptItems, clubs
   const [mode,setMode]=useState("external");
   const [staffName,setStaffName]=useState("");
   const [nameErr,setNameErr]=useState(false);
+  const [subcatPick,setSubcatPick]=useState(null);
+  const [selectedSubcat,setSelectedSubcat]=useState(null);
   const [modal,setModal]=useState(null);
   const [pulsingIdx,setPulsingIdx]=useState(null);
 
@@ -698,22 +775,35 @@ function DeptTab({ dept, log, onLog, onBulkLog, onBulkComplete, deptItems, clubs
   const deptLog=log.filter(e=>e.dept===dept);
   const deptTotal=deptLog.reduce((s,e)=>s+e.rate,0);
 
-  const handleLogClick=idx=>{if(!staffName){setNameErr(true);return;}setNameErr(false);setModal(idx);};
+  const handleLogClick=idx=>{
+    if(!staffName){setNameErr(true);return;}
+    setNameErr(false);
+    const item=items[idx];
+    if(item.subcategories.length>1){ setSubcatPick(idx); }
+    else { setSelectedSubcat(item.subcategories[0]); setModal(idx); }
+  };
+
+  const handleSubcatSelect=sub=>{
+    setSelectedSubcat(sub);
+    setModal(subcatPick);
+    setSubcatPick(null);
+  };
 
   const handleConfirm=async (entries, notes="")=>{
     const item=items[modal];
-    setModal(null);setPulsingIdx(modal);setTimeout(()=>setPulsingIdx(null),400);
+    const sub=selectedSubcat||item.subcategories[0];
+    setModal(null);setSelectedSubcat(null);setPulsingIdx(modal);setTimeout(()=>setPulsingIdx(null),400);
     const total=entries.length;
     if(total===1){
       const{club,league}=entries[0];
-      await onLog({dept,name:item.name,rate:item.rate,type:activeMode==="internal"?"Internal":"External",cat:item.cat,index_score:item.index_score||1,recurring:item.recurring||false,staff:staffName,club,league,notes,bulkSilent:false});
+      await onLog({dept,name:item.name,subcat:sub.subcat,rate:sub.rate,type:activeMode==="internal"?"Internal":"External",cat:item.cat,index_score:sub.index_score||1,recurring:sub.recurring||false,staff:staffName,club,league,notes,bulkSilent:false});
     } else {
       // Build all entries first, add to UI optimistically, then send as one batch request
       const newEntries = entries.map(({club,league})=>({
-        dept,name:item.name,rate:item.rate,
+        dept,name:item.name,subcat:sub.subcat,rate:sub.rate,
         type:activeMode==="internal"?"Internal":"External",
-        cat:item.cat,index_score:item.index_score||1,
-        recurring:item.recurring||false,staff:staffName,club,league,notes,
+        cat:item.cat,index_score:sub.index_score||1,
+        recurring:sub.recurring||false,staff:staffName,club,league,notes,
         id:`${Date.now()}-${Math.random().toString(36).slice(2)}`,
         ts:Date.now(),
       }));
@@ -725,7 +815,7 @@ function DeptTab({ dept, log, onLog, onBulkLog, onBulkComplete, deptItems, clubs
       } catch(err) {
         console.error("Batch insert failed:", err);
       }
-      onBulkComplete(total, item.name, item.rate*total);
+      onBulkComplete(total, item.name, sub.rate*total);
     }
   };
 
@@ -778,11 +868,25 @@ function DeptTab({ dept, log, onLog, onBulkLog, onBulkComplete, deptItems, clubs
         :<CategoryGroupedCards items={items} log={log} dept={dept} cfg={cfg} pulsingIdx={pulsingIdx} onLogClick={handleLogClick}/>
       }
 
-      {modal!==null&&(
-        activeMode==="internal"
-          ?<InternalModal item={items[modal]} deptCfg={cfg} dept={dept} clubsByLeague={clubsByLeague} onConfirm={handleConfirm} onCancel={()=>setModal(null)}/>
-          :<ExternalModal item={items[modal]} deptCfg={cfg} clubsByLeague={clubsByLeague} onConfirm={handleConfirm} onCancel={()=>setModal(null)}/>
+      {subcatPick!==null&&(
+        <SubcategoryPickerModal item={items[subcatPick]} deptCfg={cfg} onSelect={handleSubcatSelect} onCancel={()=>setSubcatPick(null)}/>
       )}
+
+      {modal!==null&&(()=>{
+        const sub=selectedSubcat||items[modal].subcategories[0];
+        const effectiveItem={
+          name: items[modal].subcategories.length>1 ? `${items[modal].name} — ${sub.subcat}` : items[modal].name,
+          cat: items[modal].cat,
+          leagueSelect: items[modal].leagueSelect,
+          rate: sub.rate,
+          index_score: sub.index_score,
+          recurring: sub.recurring,
+          examples: sub.examples,
+        };
+        return activeMode==="internal"
+          ? <InternalModal item={effectiveItem} deptCfg={cfg} dept={dept} clubsByLeague={clubsByLeague} onConfirm={handleConfirm} onCancel={()=>{setModal(null);setSelectedSubcat(null);}}/>
+          : <ExternalModal item={effectiveItem} deptCfg={cfg} clubsByLeague={clubsByLeague} onConfirm={handleConfirm} onCancel={()=>{setModal(null);setSelectedSubcat(null);}}/>;
+      })()}
     </div>
   );
 }
@@ -1629,9 +1733,12 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
                     <TD bold color="#111827">{e.staff}</TD>
                     <TD><DeptChip dept={e.dept}/></TD>
                     <TD>
-                      <div style={{display:"flex",alignItems:"center",gap:6}}>
-                        {e.name}
-                        {e.recurring&&<RecurringBadge/>}
+                      <div>
+                        <div style={{display:"flex",alignItems:"center",gap:6}}>
+                          {e.name}
+                          {e.recurring&&<RecurringBadge/>}
+                        </div>
+                        {e.subcat&&e.subcat!==e.name&&<div style={{fontSize:11,color:"#9CA3AF",marginTop:2}}>{e.subcat}</div>}
                       </div>
                     </TD>
                     <TD><Badge type={e.type}/></TD>
