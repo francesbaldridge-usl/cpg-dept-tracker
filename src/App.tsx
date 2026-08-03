@@ -1156,6 +1156,8 @@ function Dashboard({ log, onExport, clubsByLeague, clubClusters }) {
   const [cluster,      setCluster]     = useState("all");
   const [filterYear,   setFilterYear]  = useState("all");
   const [filterMonth,  setFilterMonth] = useState("all");
+  const [customStart,  setCustomStart] = useState("");
+  const [customEnd,    setCustomEnd]   = useState("");
   const [entryType,    setEntryType]   = useState("all");
   const [scope,        setScope]       = useState("all");
   const [metric,       setMetric]      = useState("index");
@@ -1168,7 +1170,13 @@ function Dashboard({ log, onExport, clubsByLeague, clubClusters }) {
   const availableYears = [...new Set((log||[]).map(e=>new Date(e.ts).getFullYear()))].sort((a,b)=>b-a);
 
   // Filters
+  const hasCustomRange = !!(customStart || customEnd);
   const timeFiltered = (log||[]).filter(e=>{
+    if (hasCustomRange) {
+      if (customStart && e.ts < new Date(customStart+"T00:00:00").getTime()) return false;
+      if (customEnd && e.ts > new Date(customEnd+"T23:59:59.999").getTime()) return false;
+      return true;
+    }
     const d=new Date(e.ts);
     if(filterYear!=="all"&&d.getFullYear()!==parseInt(filterYear)) return false;
     if(filterMonth!=="all"&&d.getMonth()!==parseInt(filterMonth)) return false;
@@ -1197,7 +1205,7 @@ function Dashboard({ log, onExport, clubsByLeague, clubClusters }) {
   const attributionLog = scope==="internal" ? leagueFiltered.filter(e=>e.type==="Internal") : externalLog;
   const attributionLabel = scope==="internal" ? "Recipients" : "Clubs";
   const clusterList = [...new Set(Object.values(clubClusters))].filter(Boolean).sort();
-  const resetFilters = () => { setLeague("all"); setCluster("all"); setFilterYear("all"); setFilterMonth("all"); setEntryType("all"); setScope("all"); setMetric("index"); };
+  const resetFilters = () => { setLeague("all"); setCluster("all"); setFilterYear("all"); setFilterMonth("all"); setCustomStart(""); setCustomEnd(""); setEntryType("all"); setScope("all"); setMetric("index"); };
 
   // Stats
   const total     = leagueFiltered.length;
@@ -1305,11 +1313,11 @@ function Dashboard({ log, onExport, clubsByLeague, clubClusters }) {
         {/* Row 2: Period */}
         <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
           <span style={{fontSize:9,fontWeight:700,letterSpacing:1.2,color:"#4a6fa8",width:52,flexShrink:0}}>PERIOD</span>
-          <button onClick={()=>{setFilterYear("all");setFilterMonth("all");}} style={{padding:"6px 12px",border:`1.5px solid ${filterYear==="all"?"#f51200":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:filterYear==="all"?700:400,fontSize:12,cursor:"pointer",background:filterYear==="all"?"#f51200":"transparent",color:filterYear==="all"?"#fff":"#64748B",transition:"all .15s"}}>All Time</button>
+          <button onClick={()=>{setFilterYear("all");setFilterMonth("all");setCustomStart("");setCustomEnd("");}} style={{padding:"6px 12px",border:`1.5px solid ${(!hasCustomRange&&filterYear==="all")?"#f51200":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:(!hasCustomRange&&filterYear==="all")?700:400,fontSize:12,cursor:"pointer",background:(!hasCustomRange&&filterYear==="all")?"#f51200":"transparent",color:(!hasCustomRange&&filterYear==="all")?"#fff":"#64748B",transition:"all .15s"}}>All Time</button>
           {availableYears.map(y=>(
-            <button key={y} onClick={()=>{setFilterYear(String(y));setFilterMonth("all");}} style={{padding:"6px 12px",border:`1.5px solid ${filterYear===String(y)?"#f51200":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:filterYear===String(y)?700:400,fontSize:12,cursor:"pointer",background:filterYear===String(y)?"#f51200":"transparent",color:filterYear===String(y)?"#fff":"#64748B",transition:"all .15s"}}>{y}</button>
+            <button key={y} onClick={()=>{setFilterYear(String(y));setFilterMonth("all");setCustomStart("");setCustomEnd("");}} style={{padding:"6px 12px",border:`1.5px solid ${(!hasCustomRange&&filterYear===String(y))?"#f51200":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:(!hasCustomRange&&filterYear===String(y))?700:400,fontSize:12,cursor:"pointer",background:(!hasCustomRange&&filterYear===String(y))?"#f51200":"transparent",color:(!hasCustomRange&&filterYear===String(y))?"#fff":"#64748B",transition:"all .15s"}}>{y}</button>
           ))}
-          {filterYear!=="all"&&(
+          {!hasCustomRange&&filterYear!=="all"&&(
             <>
               <div style={{width:1,height:16,background:"#0a2d6e",margin:"0 4px"}}/>
               <button onClick={()=>setFilterMonth("all")} style={{padding:"5px 10px",border:`1.5px solid ${filterMonth==="all"?"#fff":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:filterMonth==="all"?700:400,fontSize:11,cursor:"pointer",background:filterMonth==="all"?"#fff":"transparent",color:filterMonth==="all"?"#011e5c":"#64748B",transition:"all .15s"}}>All</button>
@@ -1318,6 +1326,14 @@ function Dashboard({ log, onExport, clubsByLeague, clubClusters }) {
               ))}
             </>
           )}
+          <div style={{width:1,height:16,background:"#0a2d6e",margin:"0 4px"}}/>
+          <span style={{fontSize:11,fontWeight:hasCustomRange?700:400,color:hasCustomRange?"#fff":"#64748B"}}>Custom range:</span>
+          <input type="date" value={customStart} onChange={e=>{setCustomStart(e.target.value);setFilterYear("all");setFilterMonth("all");}}
+            style={{padding:"5px 8px",border:`1.5px solid ${hasCustomRange?"#fff":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontSize:12,background:"#fff",color:"#111",outline:"none"}}/>
+          <span style={{fontSize:12,color:"#64748B"}}>to</span>
+          <input type="date" value={customEnd} onChange={e=>{setCustomEnd(e.target.value);setFilterYear("all");setFilterMonth("all");}}
+            style={{padding:"5px 8px",border:`1.5px solid ${hasCustomRange?"#fff":"#0a2d6e"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontSize:12,background:"#fff",color:"#111",outline:"none"}}/>
+          {hasCustomRange&&<button onClick={()=>{setCustomStart("");setCustomEnd("");}} style={{padding:"5px 10px",border:"1.5px solid #0a2d6e",borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:600,fontSize:11,cursor:"pointer",background:"transparent",color:"#F87171"}}>Clear</button>}
         </div>
 
         <div style={{height:1,background:"#0a2d6e"}}/>
