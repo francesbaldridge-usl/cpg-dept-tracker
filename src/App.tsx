@@ -60,6 +60,8 @@ const FALLBACK_CLUBS = {
 //  INTERNAL RECIPIENTS
 // ─────────────────────────────────────────────────────────────────────────────
 
+const LEAGUE_TIER_OPTIONS = ["Championship","League One","Premier","Super League","Expansion"];
+
 const INTERNAL_RECIPIENTS = {
   "Corp Partnerships":   ["HQ Corp Partnerships","League Operations"],
   "Marketing":           ["HQ Marketing / Comms","Expansion","Onboarding"],
@@ -516,14 +518,18 @@ function ExternalModal({ item, deptCfg, clubsByLeague, onConfirm, onCancel }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function InternalModal({ item, deptCfg, dept, clubsByLeague, onConfirm, onCancel }) {
-  const [recipient,    setRecipient]   = useState("");
-  const [chosenLeague, setChosenLeague]= useState("");
-  const [notes,        setNotes]       = useState("");
+  const [recipient,      setRecipient]     = useState("");
+  const [chosenLeague,   setChosenLeague]  = useState("");
+  const [chosenTiers,    setChosenTiers]   = useState([]);
+  const [notes,          setNotes]         = useState("");
   const recipients = INTERNAL_RECIPIENTS[dept]||[];
   const isLeagueSelect = item.leagueSelect;
+  const isLeagueOpsTiers = (dept==="Ticketing"||dept==="Corp Partnerships") && recipient==="League Operations";
+  const toggleTier = l => setChosenTiers(prev=>prev.includes(l)?prev.filter(x=>x!==l):[...prev,l]);
 
   const getEntries = () => {
     if (isLeagueSelect&&chosenLeague) return (clubsByLeague[chosenLeague]||[]).map(club=>({club,league:chosenLeague}));
+    if (isLeagueOpsTiers) return chosenTiers.map(l=>({club:recipient,league:l}));
     return recipient?[{club:recipient,league:"Internal"}]:[];
   };
   const entries=getEntries(), count=entries.length;
@@ -555,12 +561,32 @@ function InternalModal({ item, deptCfg, dept, clubsByLeague, onConfirm, onCancel
             <label style={{display:"block",fontSize:12,fontWeight:700,color:"#6B7280",letterSpacing:.5,marginBottom:10}}>INTERNAL RECIPIENT</label>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {recipients.map(r=>(
-                <div key={r} onClick={()=>setRecipient(r)} style={{border:`2px solid ${recipient===r?deptCfg.color:"#E5E7EB"}`,borderRadius:10,padding:"12px 14px",cursor:"pointer",background:recipient===r?deptCfg.light:"#fff",display:"flex",alignItems:"center",gap:10}}>
+                <div key={r} onClick={()=>{setRecipient(r);setChosenTiers([]);}} style={{border:`2px solid ${recipient===r?deptCfg.color:"#E5E7EB"}`,borderRadius:10,padding:"12px 14px",cursor:"pointer",background:recipient===r?deptCfg.light:"#fff",display:"flex",alignItems:"center",gap:10}}>
                   <div style={{width:16,height:16,borderRadius:"50%",border:`2px solid ${recipient===r?deptCfg.color:"#D1D5DB"}`,background:recipient===r?deptCfg.color:"#fff",flexShrink:0}}/>
                   <span style={{fontWeight:600,fontSize:14,color:"#111827"}}>{r}</span>
                 </div>
               ))}
             </div>
+
+            {isLeagueOpsTiers&&(
+              <div style={{marginTop:16}}>
+                <label style={{display:"block",fontSize:12,fontWeight:700,color:"#6B7280",letterSpacing:.5,marginBottom:10}}>APPLIES TO LEAGUE(S)</label>
+                <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:220,overflowY:"auto",border:`1px solid ${deptCfg.border}`,borderRadius:8,padding:"4px 0"}}>
+                  {LEAGUE_TIER_OPTIONS.map(l=>{
+                    const checked=chosenTiers.includes(l);
+                    return(
+                      <div key={l} onClick={()=>toggleTier(l)} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",cursor:"pointer",background:checked?deptCfg.light:"transparent"}}>
+                        <div style={{width:15,height:15,borderRadius:4,border:`2px solid ${checked?deptCfg.color:"#D1D5DB"}`,background:checked?deptCfg.color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                          {checked&&<span style={{color:"#fff",fontSize:10,fontWeight:900}}>✓</span>}
+                        </div>
+                        <span style={{fontSize:13,color:"#374151"}}>{l}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {chosenTiers.length>0&&<div style={{fontSize:12,color:deptCfg.color,fontWeight:600,marginTop:6}}>{chosenTiers.length} league{chosenTiers.length>1?"s":""} selected · {count} entries × {fmt$(item.rate)} = {fmt$(count*item.rate)} total</div>}
+              </div>
+            )}
           </>
         )}
 
