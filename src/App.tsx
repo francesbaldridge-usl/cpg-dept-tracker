@@ -431,6 +431,8 @@ function ExternalModal({ item, deptCfg, clubsByLeague, onConfirm, onCancel }) {
   const [chosenLeague, setChosenLeague]= useState("");
   const [chosenClubs,  setChosenClubs] = useState([]);
   const [chosenClub,   setChosenClub]  = useState("");
+  const [singleSearch, setSingleSearch]= useState("");
+  const [multiSearch,  setMultiSearch] = useState("");
   const [notes,        setNotes]       = useState("");
 
   const allFlat = Object.entries(clubsByLeague).flatMap(([league,clubs])=>clubs.map(club=>({club,league})));
@@ -443,6 +445,12 @@ function ExternalModal({ item, deptCfg, clubsByLeague, onConfirm, onCancel }) {
   const entries=getEntries(), count=entries.length, totalVal=count*item.rate;
   const toggleClub=club=>setChosenClubs(prev=>prev.includes(club)?prev.filter(c=>c!==club):[...prev,club]);
   const ss={width:"100%",fontFamily:"'DM Sans',sans-serif",fontSize:14,border:`2px solid ${deptCfg.color}`,borderRadius:8,padding:"9px 12px",background:"#fff",color:"#111",cursor:"pointer",outline:"none",marginTop:8,appearance:"none"};
+  const searchStyle={...ss,cursor:"text",appearance:"auto"};
+
+  const singleMatches = singleSearch ? allFlat.filter(({club})=>club.toLowerCase().includes(singleSearch.toLowerCase())) : [];
+  const multiFiltered = Object.entries(clubsByLeague).map(([league,clubs])=>[
+    league, multiSearch ? clubs.filter(c=>c.toLowerCase().includes(multiSearch.toLowerCase())) : clubs
+  ]).filter(([,clubs])=>clubs.length>0);
 
   const OBox=({id,title,sub,children})=>(
     <div onClick={()=>setSelection(id)} style={{border:`2px solid ${selection===id?deptCfg.color:"#E5E7EB"}`,borderRadius:10,padding:"12px 14px",marginBottom:8,cursor:"pointer",background:selection===id?deptCfg.light:"#fff"}}>
@@ -462,19 +470,37 @@ function ExternalModal({ item, deptCfg, clubsByLeague, onConfirm, onCancel }) {
         <label style={{display:"block",fontSize:12,fontWeight:700,color:"#6B7280",letterSpacing:.5,marginBottom:10}}>ATTRIBUTE TO</label>
 
         <OBox id="single" title="🏟️ Specific Club" sub="Log for one individual club">
-          <select value={chosenClub} onChange={e=>setChosenClub(e.target.value)} style={ss}>
-            <option value="">Select a club…</option>
-            {Object.entries(clubsByLeague).map(([league,clubs])=>(
-              <optgroup key={league} label={`── ${league} ──`}>
-                {clubs.map(c=><option key={c} value={c}>{c}</option>)}
-              </optgroup>
-            ))}
-          </select>
+          {chosenClub?(
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:deptCfg.light,border:`1.5px solid ${deptCfg.color}`,borderRadius:8,padding:"9px 12px"}}>
+              <span style={{fontSize:14,fontWeight:700,color:"#111827"}}>{chosenClub}</span>
+              <span onClick={e=>{e.stopPropagation();setChosenClub("");setSingleSearch("");}} style={{cursor:"pointer",color:"#6B7280",fontSize:13,fontWeight:700}}>✕</span>
+            </div>
+          ):(
+            <>
+              <input type="text" value={singleSearch} onChange={e=>setSingleSearch(e.target.value)} onClick={e=>e.stopPropagation()}
+                placeholder="Type to search clubs…" style={searchStyle}/>
+              {singleSearch&&(
+                <div style={{marginTop:6,maxHeight:200,overflowY:"auto",border:`1px solid ${deptCfg.border}`,borderRadius:8}}>
+                  {singleMatches.length===0
+                    ?<div style={{padding:"10px 12px",fontSize:13,color:"#9CA3AF"}}>No clubs match "{singleSearch}"</div>
+                    :singleMatches.map(({club,league})=>(
+                      <div key={club} onClick={e=>{e.stopPropagation();setChosenClub(club);}} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",cursor:"pointer",borderBottom:"1px solid #F3F4F6"}}>
+                        <span style={{fontSize:13,color:"#374151"}}>{club}</span>
+                        <LeagueBadge league={league}/>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </>
+          )}
         </OBox>
 
         <OBox id="multi" title="✅ Multiple Clubs" sub="Pick two or more specific clubs">
+          <input type="text" value={multiSearch} onChange={e=>setMultiSearch(e.target.value)} onClick={e=>e.stopPropagation()}
+            placeholder="Search clubs…" style={searchStyle}/>
           <div style={{marginTop:8,maxHeight:220,overflowY:"auto",border:`1px solid ${deptCfg.border}`,borderRadius:8,padding:"4px 0"}}>
-            {Object.entries(clubsByLeague).map(([league,clubs])=>(
+            {multiFiltered.length===0&&<div style={{padding:"10px 12px",fontSize:13,color:"#9CA3AF"}}>No clubs match "{multiSearch}"</div>}
+            {multiFiltered.map(([league,clubs])=>(
               <div key={league}>
                 <div style={{fontSize:10,fontWeight:700,color:"#6B7280",letterSpacing:.5,padding:"5px 10px",background:"#F8FAFC"}}>{league.toUpperCase()}</div>
                 {clubs.map(c=>{
@@ -553,7 +579,7 @@ function InternalModal({ item, deptCfg, dept, clubsByLeague, onConfirm, onCancel
   const [notes,          setNotes]         = useState("");
   const recipients = INTERNAL_RECIPIENTS[dept]||[];
   const isLeagueSelect = item.leagueSelect;
-  const isLeagueOpsTiers = (dept==="Ticketing"||dept==="Corp Partnerships") && recipient==="League Operations";
+  const isLeagueOpsTiers = recipient==="League Operations";
   const toggleTier = l => setChosenTiers(prev=>prev.includes(l)?prev.filter(x=>x!==l):[...prev,l]);
 
   const getEntries = () => {
