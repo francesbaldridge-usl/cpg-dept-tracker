@@ -275,9 +275,9 @@ function leagueForClub(club, cbl) {
 }
 
 const LEAGUE_STYLES = {
-  "Championship":  { color:"#1D4ED8", bg:"#EFF6FF", border:"#BFDBFE" },
-  "League One":    { color:"#047857", bg:"#F0FDF4", border:"#A7F3D0" },
-  "Super League":  { color:"#7C3AED", bg:"#F5F3FF", border:"#DDD6FE" },
+  "Championship":  { color:"#b28350", bg:"#FAF3EC", border:"#E3CBAE" },
+  "League One":    { color:"#00becc", bg:"#E6FBFC", border:"#99EEF2" },
+  "Super League":  { color:"#ff8533", bg:"#FFF1E6", border:"#FFCDA3" },
   "Expansion":     { color:"#B45309", bg:"#FFFBEB", border:"#FDE68A" },
   "League-wide":   { color:"#6B7280", bg:"#F3F4F6", border:"#D1D5DB" },
   "Internal":      { color:"#047857", bg:"#F0FDF4", border:"#A7F3D0" },
@@ -1164,7 +1164,7 @@ function Dashboard({ log, onExport, clubsByLeague, clubClusters }) {
   const [showAllClubs, setShowAllClubs]= useState(false);
 
   const LEAGUES = ["all","Championship","League One","Super League","Expansion"];
-  const LEAGUE_COLORS = {"Championship":"#1D4ED8","League One":"#047857","Super League":"#7C3AED","Expansion":"#B45309","all":"#011e5c"};
+  const LEAGUE_COLORS = {"Championship":"#b28350","League One":"#00becc","Super League":"#ff8533","Expansion":"#B45309","all":"#011e5c"};
   const DEPT_COLORS = {"Corp Partnerships":"#7C3AED","Marketing":"#0369A1","Consumer Products":"#B45309","Ticketing":"#047857","Youth / Facilities":"#0891B2","League Initiatives":"#4338CA","General":"#475569"};
   const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const availableYears = [...new Set((log||[]).map(e=>new Date(e.ts).getFullYear()))].sort((a,b)=>b-a);
