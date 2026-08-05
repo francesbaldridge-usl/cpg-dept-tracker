@@ -42,7 +42,7 @@ async function dbDelete(ids) {
 
 const STAFF = [
   "Amita Singh","Frances Baldridge","Garrett Mitchell","Julian Crockett",
-  "Kendra Hodgdon","Kevin Couture","Ryan Halter","Steven Bell",
+  "Kendra Hodgdon","Kevin Couture","Ryan Halter","Steven Bell","Tim McCarthy",
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1278,6 +1278,19 @@ function Dashboard({ log, onExport, clubsByLeague, clubClusters }) {
   // leagueOnlyFiltered mirrors clusterFiltered but the other way around: respects League,
   // ignores Cluster — the base for the "by Cluster" view of the league-shaped charts below.
   const leagueOnlyFiltered = league==="all" ? typeFiltered : typeFiltered.filter(e=>e.league===league);
+  // Shared correct math for "average CPG index": average each club's own average first,
+  // then average those together. Summing every entry's raw score and dividing by club
+  // count is NOT bounded to the 1-5 scale once any club has more than one entry.
+  const avgIndexPerClub = entries => {
+    const perClub = {};
+    entries.forEach(e=>{
+      const c=e.club||"Unknown";
+      if(!perClub[c]) perClub[c]={sum:0,count:0};
+      perClub[c].sum+=Number(e.index_score||1); perClub[c].count++;
+    });
+    const clubAvgs = Object.values(perClub).map(c=>c.sum/c.count);
+    return clubAvgs.length>0 ? clubAvgs.reduce((s,v)=>s+v,0)/clubAvgs.length : null;
+  };
   const [chartAxis, setChartAxis] = useState("league");
   useEffect(()=>{ setChartAxis(cluster==="all" ? "league" : "cluster"); }, [cluster]);
   const resetFilters = () => { setLeague("all"); setCluster("all"); setFilterYear("all"); setFilterMonth("all"); setCustomStart(""); setCustomEnd(""); setEntryType("all"); setScope("all"); setMetric("index"); setChartAxis("league"); };
@@ -1289,8 +1302,8 @@ function Dashboard({ log, onExport, clubsByLeague, clubClusters }) {
   const extCnt    = leagueFiltered.filter(e=>e.type==="External").length;
   const intCnt    = leagueFiltered.filter(e=>e.type==="Internal").length;
   const stratIdx  = leagueFiltered.filter(e=>!e.recurring&&e.type==="External");
-  const stratClubCount = new Set(stratIdx.map(e=>e.club)).size;
-  const avgIndex  = stratClubCount>0?(stratIdx.reduce((s,e)=>s+Number(e.index_score||1),0)/stratClubCount).toFixed(1):"—";
+  const avgIndexVal = avgIndexPerClub(stratIdx);
+  const avgIndex  = avgIndexVal!==null ? avgIndexVal.toFixed(1) : "—";
 
   // Charts — by-league breakdowns intentionally use clusterFiltered (not leagueFiltered) so
   // selecting a single league doesn't collapse these into a trivial one-bar chart; they still
@@ -1306,8 +1319,9 @@ function Dashboard({ log, onExport, clubsByLeague, clubClusters }) {
       sub = leagueClubs.size>0 ? `(avg ${fmt$(Math.round(totalVal/clubDivisor))})` : "(avg —)";
     } else {
       const stratExt = externalLeagueEntries.filter(e=>!e.recurring);
-      sub = (leagueClubs.size>0 && stratExt.length>0)
-        ? `(avg ${(stratExt.reduce((s,e)=>s+Number(e.index_score||1),0)/clubDivisor).toFixed(1)})`
+      const avgVal = avgIndexPerClub(stratExt);
+      sub = (leagueClubs.size>0 && avgVal!==null)
+        ? `(avg ${avgVal.toFixed(1)})`
         : "(avg —)";
     }
     return { label:l, value:leagueEntries.length, color:LEAGUE_COLORS[l], sub };
@@ -1329,8 +1343,9 @@ function Dashboard({ log, onExport, clubsByLeague, clubClusters }) {
       sub = clClubs.size>0 ? `(avg ${fmt$(Math.round(totalVal/clubDivisor))})` : "(avg —)";
     } else {
       const stratExt = clExternal.filter(e=>!e.recurring);
-      sub = (clClubs.size>0 && stratExt.length>0)
-        ? `(avg ${(stratExt.reduce((s,e)=>s+Number(e.index_score||1),0)/clubDivisor).toFixed(1)})`
+      const avgVal = avgIndexPerClub(stratExt);
+      sub = (clClubs.size>0 && avgVal!==null)
+        ? `(avg ${avgVal.toFixed(1)})`
         : "(avg —)";
     }
     return { label:cl, value:clEntries.length, color:clusterColor(cl), sub };
@@ -1527,7 +1542,8 @@ function Dashboard({ log, onExport, clubsByLeague, clubClusters }) {
               macroSub = `avg ${fmt$(Math.round(totalVal/divisor))}`;
             } else {
               const stratExt = allExternal.filter(e=>!e.recurring);
-              if (stratExt.length>0) macroSub = `avg ${(stratExt.reduce((s,e)=>s+Number(e.index_score||1),0)/divisor).toFixed(1)}`;
+              const avgVal = avgIndexPerClub(stratExt);
+              if (avgVal!==null) macroSub = `avg ${avgVal.toFixed(1)}`;
             }
           }
           return <span>Total Deliverables by {isCluster?"Cluster":"League"} <span style={{fontSize:13,fontWeight:400,color:"#9CA3AF"}}>({macroSub} per club)</span></span>;
