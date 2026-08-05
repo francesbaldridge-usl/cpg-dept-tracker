@@ -1671,7 +1671,8 @@ function ActivityExplorer({ log, onRemove, onExportView, clubClusters={} }) {
   const [leagueFilter, setLeagueFilter]=useState([]);
   const [typeFilter, setTypeFilter]=useState([]);
   const [deptFilter, setDeptFilter]=useState([]);
-  const [sortMetric, setSortMetric]=useState("value");
+  const [sortKey, setSortKey]=useState("value");
+  const [sortDir, setSortDir]=useState("desc");
 
   const staffOptions = [...new Set(log.map(e=>e.staff))].filter(Boolean).sort();
   const deliverableOptions = [...new Set(log.map(e=>e.name))].filter(Boolean).sort();
@@ -1693,13 +1694,31 @@ function ActivityExplorer({ log, onRemove, onExportView, clubClusters={} }) {
 
   const total=filteredLog.reduce((s,e)=>s+e.rate,0);
 
-  const SORT_OPTIONS = {
-    club:   [["value","Total Value"],["count","# Logged"],["indexAvg","Avg Index"]],
-    league: [["value","Total Value"],["count","# Logged"],["indexAvg","Avg Index"],["clubCount","Clubs Engaged"]],
-    dept:   [["value","Total Value"],["count","# Logged"]],
-    staff:  [["value","Total Value"],["count","# Logged"],["indexAvg","Avg Index"]],
+  // Column definitions per view — drives both the clickable headers and the sort logic.
+  const VIEW_COLS = {
+    club:   [["club","Club","text"],["league","League","text"],["cluster","Cluster","text"],["count","# Logged","num"],["indexAvg","Avg Index","num"],["value","Total Value","num"]],
+    league: [["league","League","text"],["clubCount","Clubs Engaged","num"],["count","# Logged","num"],["indexAvg","Avg Index","num"],["value","Total Value","num"]],
+    dept:   [["dept","Department","text"],["count","# Logged","num"],["value","Total Value","num"],["ext","External","num"],["int","Internal","num"]],
+    staff:  [["staff","Staff Member","text"],["count","# Logged","num"],["indexAvg","Avg Index","num"],["value","Total Value","num"],["ext","External","num"],["int","Internal","num"]],
   };
-  const sortRows = rows => [...rows].sort((a,b)=>(parseFloat(b[sortMetric])||0)-(parseFloat(a[sortMetric])||0));
+  const handleSort = (key, type) => {
+    if (key===sortKey) { setSortDir(d=>d==="asc"?"desc":"asc"); }
+    else { setSortKey(key); setSortDir(type==="text"?"asc":"desc"); }
+  };
+  const sortRows = rows => [...rows].sort((a,b)=>{
+    const col = (VIEW_COLS[view]||[]).find(c=>c[0]===sortKey);
+    if (col && col[2]==="text") {
+      const av=String(a[sortKey]||"").toLowerCase(), bv=String(b[sortKey]||"").toLowerCase();
+      return sortDir==="asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+    }
+    const av=parseFloat(a[sortKey])||0, bv=parseFloat(b[sortKey])||0;
+    return sortDir==="asc" ? av-bv : bv-av;
+  });
+  const SortTH = ({colKey,label,type,right}) => (
+    <th onClick={()=>handleSort(colKey,type)} style={{padding:"11px 14px",fontWeight:700,fontSize:11,letterSpacing:.5,color:sortKey===colKey?"#011e5c":"#6B7280",borderBottom:"1px solid #E5E7EB",background:sortKey===colKey?"#F5F3FF":"#F9FAFB",textAlign:right?"right":"left",cursor:"pointer",userSelect:"none",whiteSpace:"nowrap"}}>
+      {label}{sortKey===colKey&&<span style={{marginLeft:4,fontSize:10}}>{sortDir==="asc"?"▲":"▼"}</span>}
+    </th>
+  );
 
   // By Club
   const clubMap={};
@@ -1772,7 +1791,7 @@ function ActivityExplorer({ log, onRemove, onExportView, clubClusters={} }) {
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:12}}>
         <div style={{display:"flex",background:"#F1F5F9",borderRadius:12,padding:4,gap:2}}>
           {[["club","By Club"],["league","By League"],["dept","By Department"],["staff","By Staff"],["log","Full Log"]].map(([v,label])=>(
-            <button key={v} onClick={()=>{setView(v);setExpandedClub(null);setExpandedLeague(null);setExpandedDept(null);setExpandedStaff(null);setSortMetric("value");}} style={tBtn(view===v)}>{label}</button>
+            <button key={v} onClick={()=>{setView(v);setExpandedClub(null);setExpandedLeague(null);setExpandedDept(null);setExpandedStaff(null);setSortKey("value");setSortDir("desc");}} style={tBtn(view===v)}>{label}</button>
           ))}
         </div>
         <button onClick={()=>onExportView(view,{clubRows,deptRows,staffRows,log:filteredLog})} style={{background:"#0369A1",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:13,cursor:"pointer"}}>⬇ Export This View</button>
@@ -1789,23 +1808,20 @@ function ActivityExplorer({ log, onRemove, onExportView, clubClusters={} }) {
         {hasActiveFilters?(
           <button onClick={clearAllFilters} style={{fontSize:12,fontWeight:600,color:"#EF4444",background:"transparent",border:"1.5px solid #FECACA",borderRadius:8,padding:"6px 12px",cursor:"pointer"}}>Clear all filters</button>
         ):null}
-        {SORT_OPTIONS[view]&&(
-          <>
-            <div style={{width:1,height:20,background:"#E5E7EB",margin:"0 4px"}}/>
-            <span style={{fontSize:11,fontWeight:700,color:"#9CA3AF",letterSpacing:.5}}>SORT BY</span>
-            <select value={sortMetric} onChange={e=>setSortMetric(e.target.value)} style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,border:"2px solid #E5E7EB",borderRadius:8,padding:"7px 12px",background:"#fff",color:"#111",cursor:"pointer",outline:"none"}}>
-              {SORT_OPTIONS[view].map(([v,l])=><option key={v} value={v}>{l}</option>)}
-            </select>
-          </>
-        )}
       </div>
 
       {view==="club"&&(
         <TblWrap>
-          <thead><tr><TH>Club</TH><TH>League</TH><TH>Cluster</TH><TH right># Logged</TH><TH right>Avg Index</TH><TH right>Total Value</TH><TH right>% of Total</TH></tr></thead>
+          <thead><tr>
+            <SortTH colKey="club" label="Club" type="text"/>
+            <SortTH colKey="league" label="League" type="text"/>
+            <SortTH colKey="cluster" label="Cluster" type="text"/>
+            <SortTH colKey="count" label="# Logged" type="num" right/>
+            <SortTH colKey="indexAvg" label="Avg Index" type="num" right/>
+            <SortTH colKey="value" label="Total Value" type="num" right/>
+          </tr></thead>
           <tbody>
             {clubRows.map(c=>{
-              const pct=total?c.value/total:0;
               const isExpanded=expandedClub===c.club;
               return(
                 <Fragment key={c.club}>
@@ -1821,11 +1837,10 @@ function ActivityExplorer({ log, onRemove, onExportView, clubClusters={} }) {
                     <TD right>{c.count}</TD>
                     <TD right><span style={{background:"#EEF2FF",color:"#4338CA",borderRadius:6,padding:"2px 8px",fontSize:12,fontWeight:700}}>{c.indexAvg}</span></TD>
                     <TD right bold>{fmt$(c.value)}</TD>
-                    <TD right><div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:8}}><div style={{width:60,height:6,background:"#F3F4F6",borderRadius:99,overflow:"hidden"}}><div style={{width:`${pct*100}%`,height:"100%",background:"#6366F1",borderRadius:99}}/></div>{(pct*100).toFixed(1)}%</div></TD>
                   </tr>
                   {isExpanded&&(
                     <tr key={`${c.club}-expand`}>
-                      <td colSpan={7} style={{padding:"0 0 4px 0",background:"#F8F5FF"}}>
+                      <td colSpan={6} style={{padding:"0 0 4px 0",background:"#F8F5FF"}}>
                         <ExpandPanel heading={`DELIVERABLES LOGGED FOR ${c.club.toUpperCase()}`}>
                           <LineItemTable entries={c.entries} hide={["club"]} clubClusters={clubClusters}/>
                         </ExpandPanel>
@@ -1841,10 +1856,15 @@ function ActivityExplorer({ log, onRemove, onExportView, clubClusters={} }) {
 
       {view==="league"&&(
         <TblWrap>
-          <thead><tr><TH>League</TH><TH right>Clubs Engaged</TH><TH right># Logged</TH><TH right>Avg Index</TH><TH right>Total Value</TH><TH right>% of Total</TH></tr></thead>
+          <thead><tr>
+            <SortTH colKey="league" label="League" type="text"/>
+            <SortTH colKey="clubCount" label="Clubs Engaged" type="num" right/>
+            <SortTH colKey="count" label="# Logged" type="num" right/>
+            <SortTH colKey="indexAvg" label="Avg Index" type="num" right/>
+            <SortTH colKey="value" label="Total Value" type="num" right/>
+          </tr></thead>
           <tbody>
             {leagueRows.map(l=>{
-              const pct=total?l.value/total:0;
               const ls=LEAGUE_STYLES[l.league]||LEAGUE_STYLES["League-wide"];
               const isExpanded=expandedLeague===l.league;
               return(
@@ -1860,11 +1880,10 @@ function ActivityExplorer({ log, onRemove, onExportView, clubClusters={} }) {
                     <TD right>{l.count}</TD>
                     <TD right><span style={{background:"#EEF2FF",color:"#4338CA",borderRadius:6,padding:"2px 8px",fontSize:12,fontWeight:700}}>{l.indexAvg}</span></TD>
                     <TD right bold color={ls.color}>{fmt$(l.value)}</TD>
-                    <TD right><div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:8}}><div style={{width:60,height:6,background:"#F3F4F6",borderRadius:99,overflow:"hidden"}}><div style={{width:`${pct*100}%`,height:"100%",background:ls.color,borderRadius:99}}/></div>{(pct*100).toFixed(1)}%</div></TD>
                   </tr>
                   {isExpanded&&(
                     <tr key={`${l.league}-expand`}>
-                      <td colSpan={6} style={{padding:"0 0 4px 0",background:"#F8F5FF"}}>
+                      <td colSpan={5} style={{padding:"0 0 4px 0",background:"#F8F5FF"}}>
                         <ExpandPanel heading={`DELIVERABLES LOGGED FOR ${l.league.toUpperCase()}`}>
                           <LineItemTable entries={l.entries} hide={["league"]} clubClusters={clubClusters}/>
                         </ExpandPanel>
@@ -1880,10 +1899,16 @@ function ActivityExplorer({ log, onRemove, onExportView, clubClusters={} }) {
 
       {view==="dept"&&(
         <TblWrap>
-          <thead><tr><TH>Department</TH><TH right># Logged</TH><TH right>Total Value</TH><TH right>External</TH><TH right>Internal</TH><TH right>% of Total</TH></tr></thead>
+          <thead><tr>
+            <SortTH colKey="dept" label="Department" type="text"/>
+            <SortTH colKey="count" label="# Logged" type="num" right/>
+            <SortTH colKey="value" label="Total Value" type="num" right/>
+            <SortTH colKey="ext" label="External" type="num" right/>
+            <SortTH colKey="int" label="Internal" type="num" right/>
+          </tr></thead>
           <tbody>
             {deptRows.map(d=>{
-              const cfg=DEPT_CONFIG[d.dept],pct=total?d.value/total:0;
+              const cfg=DEPT_CONFIG[d.dept];
               const isExpanded=expandedDept===d.dept;
               return(
                 <Fragment key={d.dept}>
@@ -1898,11 +1923,10 @@ function ActivityExplorer({ log, onRemove, onExportView, clubClusters={} }) {
                     <TD right bold color={cfg?.color||"#374151"}>{fmt$(d.value)}</TD>
                     <TD right color="#0369A1">{d.ext}</TD>
                     <TD right color="#047857">{d.int}</TD>
-                    <TD right><div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:8}}><div style={{width:60,height:6,background:"#F3F4F6",borderRadius:99,overflow:"hidden"}}><div style={{width:`${pct*100}%`,height:"100%",background:cfg?.color||"#6366F1",borderRadius:99}}/></div>{(pct*100).toFixed(1)}%</div></TD>
                   </tr>
                   {isExpanded&&(
                     <tr key={`${d.dept}-expand`}>
-                      <td colSpan={6} style={{padding:"0 0 4px 0",background:"#F8F5FF"}}>
+                      <td colSpan={5} style={{padding:"0 0 4px 0",background:"#F8F5FF"}}>
                         <ExpandPanel heading={`DELIVERABLES LOGGED FOR ${d.dept.toUpperCase()}`}>
                           <LineItemTable entries={d.entries} hide={["dept"]} clubClusters={clubClusters}/>
                         </ExpandPanel>
@@ -1918,10 +1942,16 @@ function ActivityExplorer({ log, onRemove, onExportView, clubClusters={} }) {
 
       {view==="staff"&&(
         <TblWrap>
-          <thead><tr><TH>Staff Member</TH><TH right># Logged</TH><TH right>Avg Index</TH><TH right>Total Value</TH><TH right>External</TH><TH right>Internal</TH><TH right>% of Total</TH></tr></thead>
+          <thead><tr>
+            <SortTH colKey="staff" label="Staff Member" type="text"/>
+            <SortTH colKey="count" label="# Logged" type="num" right/>
+            <SortTH colKey="indexAvg" label="Avg Index" type="num" right/>
+            <SortTH colKey="value" label="Total Value" type="num" right/>
+            <SortTH colKey="ext" label="External" type="num" right/>
+            <SortTH colKey="int" label="Internal" type="num" right/>
+          </tr></thead>
           <tbody>
             {staffRows.map(s=>{
-              const pct=total?s.value/total:0;
               const initials=s.staff.split(" ").map(n=>n[0]).join("").slice(0,2);
               const isExpanded=expandedStaff===s.staff;
               return(
@@ -1939,11 +1969,10 @@ function ActivityExplorer({ log, onRemove, onExportView, clubClusters={} }) {
                     <TD right bold>{fmt$(s.value)}</TD>
                     <TD right color="#0369A1">{s.ext}</TD>
                     <TD right color="#047857">{s.int}</TD>
-                    <TD right><div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:8}}><div style={{width:60,height:6,background:"#F3F4F6",borderRadius:99,overflow:"hidden"}}><div style={{width:`${pct*100}%`,height:"100%",background:"#4338CA",borderRadius:99}}/></div>{(pct*100).toFixed(1)}%</div></TD>
                   </tr>
                   {isExpanded&&(
                     <tr key={`${s.staff}-expand`}>
-                      <td colSpan={7} style={{padding:"0 0 4px 0",background:"#F8F5FF"}}>
+                      <td colSpan={6} style={{padding:"0 0 4px 0",background:"#F8F5FF"}}>
                         <ExpandPanel heading={`DELIVERABLES LOGGED BY ${s.staff.toUpperCase()}`}>
                           <LineItemTable entries={s.entries} hide={["staff"]} clubClusters={clubClusters}/>
                         </ExpandPanel>
