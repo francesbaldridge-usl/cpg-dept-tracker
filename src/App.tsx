@@ -1210,6 +1210,7 @@ function Dashboard({ log, onExport, clubsByLeague, clubClusters }) {
   // ignores Cluster — the base for the "by Cluster" view of the league-shaped charts below.
   const leagueOnlyFiltered = league==="all" ? typeFiltered : typeFiltered.filter(e=>e.league===league);
   const [chartAxis, setChartAxis] = useState("league");
+  useEffect(()=>{ setChartAxis(cluster==="all" ? "league" : "cluster"); }, [cluster]);
   const resetFilters = () => { setLeague("all"); setCluster("all"); setFilterYear("all"); setFilterMonth("all"); setCustomStart(""); setCustomEnd(""); setEntryType("all"); setScope("all"); setMetric("index"); setChartAxis("league"); };
 
   // Stats
