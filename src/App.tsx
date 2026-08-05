@@ -381,7 +381,7 @@ const TD = ({ children, right, bold, color }) => <td style={{padding:"11px 14px"
 //  LINE ITEM TABLE — shared drill-down used by Club / League / Dept / Staff views
 // ─────────────────────────────────────────────────────────────────────────────
 
-function LineItemTable({ entries, hide=[] }) {
+function LineItemTable({ entries, hide=[], clubClusters={} }) {
   const ALL_COLS = [
     { key:"date",  label:"Date",              render:e=>new Date(e.ts).toLocaleDateString() },
     { key:"staff", label:"Staff",             render:e=>e.staff },
@@ -389,6 +389,7 @@ function LineItemTable({ entries, hide=[] }) {
     { key:"name",  label:"Deliverable",       render:e=><div><div style={{display:"flex",alignItems:"center",gap:6}}>{e.name}{e.recurring&&<RecurringBadge/>}</div>{e.subcat&&e.subcat!==e.name&&<div style={{fontSize:11,color:"#9CA3AF",marginTop:2}}>{e.subcat}</div>}</div> },
     { key:"type",  label:"Type",              render:e=><Badge type={e.type}/> },
     { key:"club",  label:"Club / Recipient",  render:e=>e.club },
+    { key:"cluster",label:"Cluster",          render:e=>clubClusters[e.club]||"—" },
     { key:"league",label:"League",            render:e=><LeagueBadge league={e.league||"League-wide"}/> },
     { key:"rate",  label:"Rate",   right:true,render:e=>e.rate>0?fmt$(e.rate):"—" },
     { key:"index", label:"Index",  right:true,render:e=>e.index_score>0?<span style={{background:"#EEF2FF",color:"#4338CA",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700}}>{e.index_score}</span>:"—" },
@@ -1205,7 +1206,11 @@ function Dashboard({ log, onExport, clubsByLeague, clubClusters }) {
   const attributionLog = scope==="internal" ? leagueFiltered.filter(e=>e.type==="Internal") : externalLog;
   const attributionLabel = scope==="internal" ? "Recipients" : "Clubs";
   const clusterList = [...new Set(Object.values(clubClusters))].filter(Boolean).sort();
-  const resetFilters = () => { setLeague("all"); setCluster("all"); setFilterYear("all"); setFilterMonth("all"); setCustomStart(""); setCustomEnd(""); setEntryType("all"); setScope("all"); setMetric("index"); };
+  // leagueOnlyFiltered mirrors clusterFiltered but the other way around: respects League,
+  // ignores Cluster — the base for the "by Cluster" view of the league-shaped charts below.
+  const leagueOnlyFiltered = league==="all" ? typeFiltered : typeFiltered.filter(e=>e.league===league);
+  const [chartAxis, setChartAxis] = useState("league");
+  const resetFilters = () => { setLeague("all"); setCluster("all"); setFilterYear("all"); setFilterMonth("all"); setCustomStart(""); setCustomEnd(""); setEntryType("all"); setScope("all"); setMetric("index"); setChartAxis("league"); };
 
   // Stats
   const total     = leagueFiltered.length;
@@ -1237,6 +1242,31 @@ function Dashboard({ log, onExport, clubsByLeague, clubClusters }) {
     }
     return { label:l, value:leagueEntries.length, color:LEAGUE_COLORS[l], sub };
   }).filter(d=>d.value>0);
+
+  const CLUSTER_PALETTE = ["#1D4ED8","#047857","#7C3AED","#B45309","#DB2777","#0891B2","#4338CA","#B91C1C"];
+  const clusterColor = cl => CLUSTER_PALETTE[clusterList.indexOf(cl) % CLUSTER_PALETTE.length];
+
+  const byCluster = clusterList.map(cl=>{
+    const clEntries = leagueOnlyFiltered.filter(e=>clubClusters[e.club]===cl);
+    const clExternal = clEntries.filter(e=>e.type==="External");
+    const clClubs = new Set(clExternal.map(e=>e.club));
+    const clubDivisor = clClubs.size || 1;
+    let sub;
+    if (metric==="value") {
+      const totalVal = clEntries.reduce((s,e)=>s+getRackRate(e),0);
+      sub = clClubs.size>0 ? `(avg ${fmt$(Math.round(totalVal/clubDivisor))})` : "(avg —)";
+    } else {
+      const stratExt = clExternal.filter(e=>!e.recurring);
+      sub = (clClubs.size>0 && stratExt.length>0)
+        ? `(avg ${(stratExt.reduce((s,e)=>s+Number(e.index_score||1),0)/clubDivisor).toFixed(1)})`
+        : "(avg —)";
+    }
+    return { label:cl, value:clEntries.length, color:clusterColor(cl), sub };
+  }).filter(d=>d.value>0);
+
+  const usageByCluster = clusterList.map(cl=>({
+    label:cl, value:leagueOnlyFiltered.filter(e=>clubClusters[e.club]===cl).length, color:clusterColor(cl)
+  })).filter(d=>d.value>0);
 
   const deptCounts = {};
   leagueFiltered.forEach(e=>{ const k=e.dept||"General"; deptCounts[k]=(deptCounts[k]||0)+1; });
@@ -1403,28 +1433,38 @@ function Dashboard({ log, onExport, clubsByLeague, clubClusters }) {
       })()}
 
       {/* Row 1: Bar + Pie */}
+      {clusterList.length>0&&(
+        <div style={{display:"flex",justifyContent:"flex-end",gap:6}}>
+          <span style={{fontSize:11,fontWeight:700,color:"#9CA3AF",letterSpacing:.5,alignSelf:"center",marginRight:4}}>VIEW BY</span>
+          {[["league","League"],["cluster","Cluster"]].map(([v,l])=>(
+            <button key={v} onClick={()=>setChartAxis(v)} style={{padding:"5px 12px",border:`1.5px solid ${chartAxis===v?"#011e5c":"#E5E7EB"}`,borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:chartAxis===v?700:400,fontSize:12,cursor:"pointer",background:chartAxis===v?"#011e5c":"#fff",color:chartAxis===v?"#fff":"#64748B"}}>{l}</button>
+          ))}
+        </div>
+      )}
       <div style={{display:"grid",gridTemplateColumns:"1.4fr 1fr",gap:16}}>
         <Card title={(()=>{
-          const allExternal = clusterFiltered.filter(e=>e.type==="External");
+          const isCluster = chartAxis==="cluster";
+          const base = isCluster ? leagueOnlyFiltered : clusterFiltered;
+          const allExternal = base.filter(e=>e.type==="External");
           const allClubs = new Set(allExternal.map(e=>e.club));
           const divisor = allClubs.size || 1;
           let macroSub = "avg —";
           if (allClubs.size>0) {
             if (metric==="value") {
-              const totalVal = clusterFiltered.reduce((s,e)=>s+getRackRate(e),0);
+              const totalVal = base.reduce((s,e)=>s+getRackRate(e),0);
               macroSub = `avg ${fmt$(Math.round(totalVal/divisor))}`;
             } else {
               const stratExt = allExternal.filter(e=>!e.recurring);
               if (stratExt.length>0) macroSub = `avg ${(stratExt.reduce((s,e)=>s+Number(e.index_score||1),0)/divisor).toFixed(1)}`;
             }
           }
-          return <span>Total Deliverables by League <span style={{fontSize:13,fontWeight:400,color:"#9CA3AF"}}>({macroSub} per club)</span></span>;
+          return <span>Total Deliverables by {isCluster?"Cluster":"League"} <span style={{fontSize:13,fontWeight:400,color:"#9CA3AF"}}>({macroSub} per club)</span></span>;
         })()}>
-          {byLeague.length>0?<HBarChart data={byLeague} color="#1D4ED8" height={52}/>:
+          {(chartAxis==="cluster"?byCluster:byLeague).length>0?<HBarChart data={chartAxis==="cluster"?byCluster:byLeague} color="#1D4ED8" height={52}/>:
             <div style={{textAlign:"center",padding:"32px 0",color:"#9CA3AF",fontSize:13}}>No data for this filter.</div>}
         </Card>
-        <Card title="CPG Usage by League">
-          {usageByLeague.length>0?<DonutChart slices={usageByLeague} size={200} title={`${total}`} subtitle="total"/>:
+        <Card title={`CPG Usage by ${chartAxis==="cluster"?"Cluster":"League"}`}>
+          {(chartAxis==="cluster"?usageByCluster:usageByLeague).length>0?<DonutChart slices={chartAxis==="cluster"?usageByCluster:usageByLeague} size={200} title={`${total}`} subtitle="total"/>:
             <div style={{textAlign:"center",padding:"32px 0",color:"#9CA3AF",fontSize:13}}>No data.</div>}
         </Card>
       </div>
@@ -1531,29 +1571,47 @@ function Dashboard({ log, onExport, clubsByLeague, clubClusters }) {
 }
 
 
-function ActivityExplorer({ log, onRemove, onExportView }) {
+function ActivityExplorer({ log, onRemove, onExportView, clubClusters={} }) {
   const [view,setView]=useState("club");
   const [expandedClub, setExpandedClub]=useState(null);
   const [expandedLeague, setExpandedLeague]=useState(null);
   const [expandedDept, setExpandedDept]=useState(null);
   const [expandedStaff, setExpandedStaff]=useState(null);
-  const total=log.reduce((s,e)=>s+e.rate,0);
+  const [staffFilter, setStaffFilter]=useState("all");
+  const [deliverableFilter, setDeliverableFilter]=useState("all");
+  const [sortMetric, setSortMetric]=useState("value");
+
+  const staffOptions = [...new Set(log.map(e=>e.staff))].filter(Boolean).sort();
+  const deliverableOptions = [...new Set(log.map(e=>e.name))].filter(Boolean).sort();
+  const filteredLog = log
+    .filter(e=>staffFilter==="all"||e.staff===staffFilter)
+    .filter(e=>deliverableFilter==="all"||e.name===deliverableFilter);
+
+  const total=filteredLog.reduce((s,e)=>s+e.rate,0);
+
+  const SORT_OPTIONS = {
+    club:   [["value","Total Value"],["count","# Logged"],["indexAvg","Avg Index"]],
+    league: [["value","Total Value"],["count","# Logged"],["indexAvg","Avg Index"],["clubCount","Clubs Engaged"]],
+    dept:   [["value","Total Value"],["count","# Logged"]],
+    staff:  [["value","Total Value"],["count","# Logged"],["indexAvg","Avg Index"]],
+  };
+  const sortRows = rows => [...rows].sort((a,b)=>(parseFloat(b[sortMetric])||0)-(parseFloat(a[sortMetric])||0));
 
   // By Club
   const clubMap={};
-  log.filter(e=>e.type==="External").forEach(e=>{
+  filteredLog.filter(e=>e.type==="External").forEach(e=>{
     const c=e.club||"Unknown";
-    if(!clubMap[c])clubMap[c]={club:c,league:e.league||"",count:0,value:0,indexSum:0,indexCount:0,entries:[]};
+    if(!clubMap[c])clubMap[c]={club:c,league:e.league||"",cluster:clubClusters[c]||"—",count:0,value:0,indexSum:0,indexCount:0,entries:[]};
     clubMap[c].count++;clubMap[c].value+=e.rate;
     clubMap[c].entries.push(e);
     if(!e.recurring){clubMap[c].indexSum+=Number(e.index_score||1);clubMap[c].indexCount++;}
   });
   Object.values(clubMap).forEach(c=>{c.indexAvg=c.indexCount>0?(c.indexSum/c.indexCount).toFixed(1):"—";});
-  const clubRows=Object.values(clubMap).sort((a,b)=>b.value-a.value);
+  const clubRows=sortRows(Object.values(clubMap));
 
   // By League
   const leagueMap={};
-  log.filter(e=>e.type==="External").forEach(e=>{
+  filteredLog.filter(e=>e.type==="External").forEach(e=>{
     const l=e.league||"Unknown";
     if(!leagueMap[l])leagueMap[l]={league:l,count:0,value:0,indexSum:0,indexCount:0,clubs:new Set(),entries:[]};
     leagueMap[l].count++;leagueMap[l].value+=e.rate;leagueMap[l].clubs.add(e.club);
@@ -1561,21 +1619,21 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
     if(!e.recurring){leagueMap[l].indexSum+=Number(e.index_score||1);leagueMap[l].indexCount++;}
   });
   Object.values(leagueMap).forEach(l=>{l.indexAvg=l.indexCount>0?(l.indexSum/l.indexCount).toFixed(1):"—";l.clubCount=l.clubs.size;});
-  const leagueRows=Object.values(leagueMap).sort((a,b)=>b.count-a.count);
+  const leagueRows=sortRows(Object.values(leagueMap));
 
   // By Dept
   const deptMap={};
-  log.forEach(e=>{
+  filteredLog.forEach(e=>{
     if(!deptMap[e.dept])deptMap[e.dept]={dept:e.dept,count:0,value:0,ext:0,int:0,entries:[]};
     deptMap[e.dept].count++;deptMap[e.dept].value+=e.rate;
     deptMap[e.dept].entries.push(e);
     if(e.type==="External")deptMap[e.dept].ext++;else deptMap[e.dept].int++;
   });
-  const deptRows=Object.values(deptMap).sort((a,b)=>b.value-a.value);
+  const deptRows=sortRows(Object.values(deptMap));
 
   // By Staff
   const staffMap={};
-  log.forEach(e=>{
+  filteredLog.forEach(e=>{
     if(!staffMap[e.staff])staffMap[e.staff]={staff:e.staff,count:0,value:0,ext:0,int:0,indexSum:0,indexCount:0,entries:[]};
     staffMap[e.staff].count++;staffMap[e.staff].value+=e.rate;
     staffMap[e.staff].entries.push(e);
@@ -1583,16 +1641,16 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
     if(!e.recurring&&e.type==="External"){staffMap[e.staff].indexSum+=Number(e.index_score||1);staffMap[e.staff].indexCount++;}
   });
   Object.values(staffMap).forEach(s=>{s.indexAvg=s.indexCount>0?(s.indexSum/s.indexCount).toFixed(1):"—";});
-  const staffRows=Object.values(staffMap).sort((a,b)=>b.value-a.value);
+  const staffRows=sortRows(Object.values(staffMap));
 
   const tBtn=active=>({padding:"8px 18px",border:"none",borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:13,cursor:"pointer",transition:"all .15s",background:active?"#011e5c":"transparent",color:active?"#fff":"#6B7280"});
 
   const [selected,setSelected]=useState(new Set());
   const [confirm,setConfirm]=useState(false);
-  const reversed=[...log].reverse();
-  const allSelected=selected.size===log.length&&log.length>0;
+  const reversed=[...filteredLog].reverse();
+  const allSelected=selected.size===filteredLog.length&&filteredLog.length>0;
   const toggle=id=>{setSelected(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});setConfirm(false);};
-  const toggleAll=()=>{setSelected(allSelected?new Set():new Set(log.map(e=>e.id)));setConfirm(false);};
+  const toggleAll=()=>{setSelected(allSelected?new Set():new Set(filteredLog.map(e=>e.id)));setConfirm(false);};
   const handleDelete=()=>{onRemove([...selected]);setSelected(new Set());setConfirm(false);};
   const hasSelection=selected.size>0;
 
@@ -1607,18 +1665,42 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
 
   return(
     <div>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:24,flexWrap:"wrap",gap:12}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:12}}>
         <div style={{display:"flex",background:"#F1F5F9",borderRadius:12,padding:4,gap:2}}>
           {[["club","By Club"],["league","By League"],["dept","By Department"],["staff","By Staff"],["log","Full Log"]].map(([v,label])=>(
-            <button key={v} onClick={()=>{setView(v);setExpandedClub(null);setExpandedLeague(null);setExpandedDept(null);setExpandedStaff(null);}} style={tBtn(view===v)}>{label}</button>
+            <button key={v} onClick={()=>{setView(v);setExpandedClub(null);setExpandedLeague(null);setExpandedDept(null);setExpandedStaff(null);setSortMetric("value");}} style={tBtn(view===v)}>{label}</button>
           ))}
         </div>
-        <button onClick={()=>onExportView(view,{clubRows,deptRows,staffRows,log})} style={{background:"#0369A1",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:13,cursor:"pointer"}}>⬇ Export This View</button>
+        <button onClick={()=>onExportView(view,{clubRows,deptRows,staffRows,log:filteredLog})} style={{background:"#0369A1",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:13,cursor:"pointer"}}>⬇ Export This View</button>
+      </div>
+
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20,flexWrap:"wrap"}}>
+        <span style={{fontSize:11,fontWeight:700,color:"#9CA3AF",letterSpacing:.5}}>FILTER</span>
+        <select value={staffFilter} onChange={e=>setStaffFilter(e.target.value)} style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,border:`2px solid ${staffFilter!=="all"?"#011e5c":"#E5E7EB"}`,borderRadius:8,padding:"7px 12px",background:"#fff",color:"#111",cursor:"pointer",outline:"none"}}>
+          <option value="all">All Staff</option>
+          {staffOptions.map(s=><option key={s} value={s}>{s}</option>)}
+        </select>
+        <select value={deliverableFilter} onChange={e=>setDeliverableFilter(e.target.value)} style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,border:`2px solid ${deliverableFilter!=="all"?"#011e5c":"#E5E7EB"}`,borderRadius:8,padding:"7px 12px",background:"#fff",color:"#111",cursor:"pointer",outline:"none",maxWidth:260}}>
+          <option value="all">All Deliverables</option>
+          {deliverableOptions.map(d=><option key={d} value={d}>{d}</option>)}
+        </select>
+        {(staffFilter!=="all"||deliverableFilter!=="all")&&(
+          <button onClick={()=>{setStaffFilter("all");setDeliverableFilter("all");}} style={{fontSize:12,fontWeight:600,color:"#EF4444",background:"transparent",border:"1.5px solid #FECACA",borderRadius:8,padding:"6px 12px",cursor:"pointer"}}>Clear filters</button>
+        )}
+        {SORT_OPTIONS[view]&&(
+          <>
+            <div style={{width:1,height:20,background:"#E5E7EB",margin:"0 4px"}}/>
+            <span style={{fontSize:11,fontWeight:700,color:"#9CA3AF",letterSpacing:.5}}>SORT BY</span>
+            <select value={sortMetric} onChange={e=>setSortMetric(e.target.value)} style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,border:"2px solid #E5E7EB",borderRadius:8,padding:"7px 12px",background:"#fff",color:"#111",cursor:"pointer",outline:"none"}}>
+              {SORT_OPTIONS[view].map(([v,l])=><option key={v} value={v}>{l}</option>)}
+            </select>
+          </>
+        )}
       </div>
 
       {view==="club"&&(
         <TblWrap>
-          <thead><tr><TH>Club</TH><TH>League</TH><TH right># Logged</TH><TH right>Avg Index</TH><TH right>Total Value</TH><TH right>% of Total</TH></tr></thead>
+          <thead><tr><TH>Club</TH><TH>League</TH><TH>Cluster</TH><TH right># Logged</TH><TH right>Avg Index</TH><TH right>Total Value</TH><TH right>% of Total</TH></tr></thead>
           <tbody>
             {clubRows.map(c=>{
               const pct=total?c.value/total:0;
@@ -1633,6 +1715,7 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
                       </div>
                     </TD>
                     <TD><LeagueBadge league={c.league||"League-wide"}/></TD>
+                    <TD color="#6B7280">{c.cluster}</TD>
                     <TD right>{c.count}</TD>
                     <TD right><span style={{background:"#EEF2FF",color:"#4338CA",borderRadius:6,padding:"2px 8px",fontSize:12,fontWeight:700}}>{c.indexAvg}</span></TD>
                     <TD right bold>{fmt$(c.value)}</TD>
@@ -1640,9 +1723,9 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
                   </tr>
                   {isExpanded&&(
                     <tr key={`${c.club}-expand`}>
-                      <td colSpan={6} style={{padding:"0 0 4px 0",background:"#F8F5FF"}}>
+                      <td colSpan={7} style={{padding:"0 0 4px 0",background:"#F8F5FF"}}>
                         <ExpandPanel heading={`DELIVERABLES LOGGED FOR ${c.club.toUpperCase()}`}>
-                          <LineItemTable entries={c.entries} hide={["club"]}/>
+                          <LineItemTable entries={c.entries} hide={["club"]} clubClusters={clubClusters}/>
                         </ExpandPanel>
                       </td>
                     </tr>
@@ -1681,7 +1764,7 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
                     <tr key={`${l.league}-expand`}>
                       <td colSpan={6} style={{padding:"0 0 4px 0",background:"#F8F5FF"}}>
                         <ExpandPanel heading={`DELIVERABLES LOGGED FOR ${l.league.toUpperCase()}`}>
-                          <LineItemTable entries={l.entries} hide={["league"]}/>
+                          <LineItemTable entries={l.entries} hide={["league"]} clubClusters={clubClusters}/>
                         </ExpandPanel>
                       </td>
                     </tr>
@@ -1719,7 +1802,7 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
                     <tr key={`${d.dept}-expand`}>
                       <td colSpan={6} style={{padding:"0 0 4px 0",background:"#F8F5FF"}}>
                         <ExpandPanel heading={`DELIVERABLES LOGGED FOR ${d.dept.toUpperCase()}`}>
-                          <LineItemTable entries={d.entries} hide={["dept"]}/>
+                          <LineItemTable entries={d.entries} hide={["dept"]} clubClusters={clubClusters}/>
                         </ExpandPanel>
                       </td>
                     </tr>
@@ -1760,7 +1843,7 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
                     <tr key={`${s.staff}-expand`}>
                       <td colSpan={7} style={{padding:"0 0 4px 0",background:"#F8F5FF"}}>
                         <ExpandPanel heading={`DELIVERABLES LOGGED BY ${s.staff.toUpperCase()}`}>
-                          <LineItemTable entries={s.entries} hide={["staff"]}/>
+                          <LineItemTable entries={s.entries} hide={["staff"]} clubClusters={clubClusters}/>
                         </ExpandPanel>
                       </td>
                     </tr>
@@ -1777,10 +1860,10 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:10,fontFamily:"'DM Sans',sans-serif"}}>
             <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13,color:"#374151",fontWeight:500,userSelect:"none"}}>
               <Checkbox checked={allSelected} indeterminate={selected.size>0&&!allSelected} onClick={toggleAll}/>
-              {selected.size===0?"Select entries to delete":`${selected.size} of ${log.length} selected`}
+              {selected.size===0?"Select entries to delete":`${selected.size} of ${filteredLog.length} selected`}
             </label>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
-              {hasSelection&&!confirm&&<span style={{fontSize:12,color:"#6B7280"}}>{selected.size} {selected.size===1?"entry":"entries"} · {fmt$(log.filter(e=>selected.has(e.id)).reduce((s,e)=>s+e.rate,0))} value</span>}
+              {hasSelection&&!confirm&&<span style={{fontSize:12,color:"#6B7280"}}>{selected.size} {selected.size===1?"entry":"entries"} · {fmt$(filteredLog.filter(e=>selected.has(e.id)).reduce((s,e)=>s+e.rate,0))} value</span>}
               {!confirm?(
                 <button onClick={()=>hasSelection&&setConfirm(true)} style={{background:hasSelection?"#FEE2E2":"#F3F4F6",color:hasSelection?"#991B1B":"#9CA3AF",border:`1px solid ${hasSelection?"#FECACA":"#E5E7EB"}`,borderRadius:8,padding:"8px 16px",fontFamily:"'DM Sans',sans-serif",fontWeight:600,fontSize:13,cursor:hasSelection?"pointer":"not-allowed"}}>🗑 Delete Selected</button>
               ):(
@@ -1795,7 +1878,7 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
           <TblWrap>
             <thead><tr>
               <th style={{padding:"11px 14px",width:40,background:"#F9FAFB",borderBottom:"1px solid #E5E7EB"}}/>
-              <TH>#</TH><TH>Time</TH><TH>Staff</TH><TH>Dept</TH><TH>Deliverable</TH><TH>Type</TH><TH>Club / Recipient</TH><TH>League</TH><TH right>Rack Rate</TH><TH right>Index</TH><TH>Notes</TH>
+              <TH>#</TH><TH>Time</TH><TH>Staff</TH><TH>Dept</TH><TH>Deliverable</TH><TH>Type</TH><TH>Club / Recipient</TH><TH>Cluster</TH><TH>League</TH><TH right>Rack Rate</TH><TH right>Index</TH><TH>Notes</TH>
             </tr></thead>
             <tbody>
               {reversed.map((e,i)=>{
@@ -1803,7 +1886,7 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
                 return(
                   <tr key={e.id} style={{background:checked?"#FEF2F2":undefined,transition:"background .15s"}}>
                     <td style={{padding:"10px 14px",textAlign:"center"}}><Checkbox checked={checked} onClick={()=>toggle(e.id)}/></td>
-                    <td style={{padding:"10px 14px",color:"#9CA3AF",fontSize:11}}>{log.length-i}</td>
+                    <td style={{padding:"10px 14px",color:"#9CA3AF",fontSize:11}}>{filteredLog.length-i}</td>
                     <td style={{padding:"10px 14px",color:"#6B7280",fontSize:12}}>{new Date(e.ts).toLocaleString()}</td>
                     <TD bold color="#111827">{e.staff}</TD>
                     <TD><DeptChip dept={e.dept}/></TD>
@@ -1818,6 +1901,7 @@ function ActivityExplorer({ log, onRemove, onExportView }) {
                     </TD>
                     <TD><Badge type={e.type}/></TD>
                     <TD color="#374151">{e.club}</TD>
+                    <TD color="#6B7280">{clubClusters[e.club]||"—"}</TD>
                     <TD><LeagueBadge league={e.league||"League-wide"}/></TD>
                     <TD right bold color={DEPT_CONFIG[e.dept]?.color||"#374151"}>{e.rate>0?fmt$(e.rate):"—"}</TD>
                     <TD right>{e.index_score>0?<span style={{background:"#EEF2FF",color:"#4338CA",borderRadius:6,padding:"2px 8px",fontSize:12,fontWeight:700}}>{e.index_score}</span>:"—"}</TD>
@@ -2098,7 +2182,7 @@ export default function App() {
           ):(
             <div style={{maxWidth:"100%",padding:"28px 40px"}}>
               {activeTab==="Dashboard"         &&<Dashboard log={log} onExport={()=>exportExcel(log)} clubsByLeague={clubsByLeague} clubClusters={clubClusters}/>}
-              {activeTab==="Activity Explorer" &&<ActivityExplorer log={log} onRemove={handleRemove} onExportView={exportView}/>}
+              {activeTab==="Activity Explorer" &&<ActivityExplorer log={log} onRemove={handleRemove} onExportView={exportView} clubClusters={clubClusters}/>}
               {ALL_DEPT_NAMES.includes(activeTab)&&<DeptTab dept={activeTab} log={log} onLog={handleLog} onBulkLog={handleBulkLog} onBulkComplete={handleBulkComplete} deptItems={deptItems} clubsByLeague={clubsByLeague}/>}
             </div>
           )}
