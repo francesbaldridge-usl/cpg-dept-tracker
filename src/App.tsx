@@ -1097,12 +1097,18 @@ function DonutChart({ slices, size=220, title, subtitle }) {
   const r = size/2-16, cx=size/2, cy=size/2;
   let cumAngle = -Math.PI/2;
   const arcs = safeSlices.map((sl,i) => {
+    const startAngle = cumAngle;
     const angle = (sl.value/total)*2*Math.PI;
     const x1=cx+r*Math.cos(cumAngle), y1=cy+r*Math.sin(cumAngle);
     cumAngle+=angle;
     const x2=cx+r*Math.cos(cumAngle), y2=cy+r*Math.sin(cumAngle);
     const midAngle=cumAngle-angle/2;
-    return{...sl,x1,y1,x2,y2,large:angle>Math.PI?1:0,midAngle,pct:sl.value/total,index:i};
+    // A single 100% slice has identical start/end points, which collapses a normal SVG arc
+    // to nothing visible — draw it as two semicircles instead when that's the case.
+    const isFull = angle >= 2*Math.PI - 0.001;
+    const halfAngle = startAngle + angle/2;
+    const xh=cx+r*Math.cos(halfAngle), yh=cy+r*Math.sin(halfAngle);
+    return{...sl,x1,y1,x2,y2,xh,yh,isFull,large:angle>Math.PI?1:0,midAngle,pct:sl.value/total,index:i};
   });
   const innerR=r*0.56;
   return (
@@ -1112,9 +1118,12 @@ function DonutChart({ slices, size=220, title, subtitle }) {
           {arcs.map((arc,i)=>{
             const isH=hovered===i;
             const off=isH?7:0, ox=off*Math.cos(arc.midAngle), oy=off*Math.sin(arc.midAngle);
+            const d = arc.isFull
+              ? `M ${arc.x1+ox} ${arc.y1+oy} A ${r} ${r} 0 1 1 ${arc.xh+ox} ${arc.yh+oy} A ${r} ${r} 0 1 1 ${arc.x2+ox} ${arc.y2+oy} Z`
+              : `M ${cx+ox} ${cy+oy} L ${arc.x1+ox} ${arc.y1+oy} A ${r} ${r} 0 ${arc.large} 1 ${arc.x2+ox} ${arc.y2+oy} Z`;
             return(
               <path key={i}
-                d={`M ${cx+ox} ${cy+oy} L ${arc.x1+ox} ${arc.y1+oy} A ${r} ${r} 0 ${arc.large} 1 ${arc.x2+ox} ${arc.y2+oy} Z`}
+                d={d}
                 fill={arc.color} stroke="#fff" strokeWidth={2.5}
                 style={{cursor:"pointer",filter:isH?`drop-shadow(0 4px 12px ${arc.color}88)`:"none",transition:"filter .15s"}}
                 onMouseEnter={()=>setHovered(i)} onMouseLeave={()=>setHovered(null)}
@@ -1245,10 +1254,12 @@ function Dashboard({ log, onExport, clubsByLeague, clubClusters }) {
   }).filter(d=>d.value>0);
 
   const CLUSTER_PALETTE = ["#1D4ED8","#047857","#7C3AED","#B45309","#DB2777","#0891B2","#4338CA","#B91C1C"];
-  const clusterColor = cl => CLUSTER_PALETTE[clusterList.indexOf(cl) % CLUSTER_PALETTE.length];
+  const CLUSTER_BUCKETS = [...clusterList, "No Cluster"];
+  const clusterColor = cl => cl==="No Cluster" ? "#9CA3AF" : CLUSTER_PALETTE[clusterList.indexOf(cl) % CLUSTER_PALETTE.length];
+  const matchesCluster = (e,cl) => cl==="No Cluster" ? !clubClusters[e.club] : clubClusters[e.club]===cl;
 
-  const byCluster = clusterList.map(cl=>{
-    const clEntries = leagueOnlyFiltered.filter(e=>clubClusters[e.club]===cl);
+  const byCluster = CLUSTER_BUCKETS.map(cl=>{
+    const clEntries = leagueOnlyFiltered.filter(e=>matchesCluster(e,cl));
     const clExternal = clEntries.filter(e=>e.type==="External");
     const clClubs = new Set(clExternal.map(e=>e.club));
     const clubDivisor = clClubs.size || 1;
@@ -1265,8 +1276,8 @@ function Dashboard({ log, onExport, clubsByLeague, clubClusters }) {
     return { label:cl, value:clEntries.length, color:clusterColor(cl), sub };
   }).filter(d=>d.value>0);
 
-  const usageByCluster = clusterList.map(cl=>({
-    label:cl, value:leagueOnlyFiltered.filter(e=>clubClusters[e.club]===cl).length, color:clusterColor(cl)
+  const usageByCluster = CLUSTER_BUCKETS.map(cl=>({
+    label:cl, value:leagueOnlyFiltered.filter(e=>matchesCluster(e,cl)).length, color:clusterColor(cl)
   })).filter(d=>d.value>0);
 
   const deptCounts = {};
@@ -1465,7 +1476,7 @@ function Dashboard({ log, onExport, clubsByLeague, clubClusters }) {
             <div style={{textAlign:"center",padding:"32px 0",color:"#9CA3AF",fontSize:13}}>No data for this filter.</div>}
         </Card>
         <Card title={`CPG Usage by ${chartAxis==="cluster"?"Cluster":"League"}`}>
-          {(chartAxis==="cluster"?usageByCluster:usageByLeague).length>0?<DonutChart slices={chartAxis==="cluster"?usageByCluster:usageByLeague} size={200} title={`${total}`} subtitle="total"/>:
+          {(chartAxis==="cluster"?usageByCluster:usageByLeague).length>0?<DonutChart slices={chartAxis==="cluster"?usageByCluster:usageByLeague} size={200} title={`${(chartAxis==="cluster"?usageByCluster:usageByLeague).reduce((s,d)=>s+d.value,0)}`} subtitle="total"/>:
             <div style={{textAlign:"center",padding:"32px 0",color:"#9CA3AF",fontSize:13}}>No data.</div>}
         </Card>
       </div>
