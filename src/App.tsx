@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useEffect, useCallback, Fragment } from "react";
+import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import * as XLSX from "xlsx";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -42,7 +42,7 @@ async function dbDelete(ids) {
 
 const STAFF = [
   "Amita Singh","Frances Baldridge","Garrett Mitchell","Julian Crockett",
-  "Kendra Hodgdon","Kevin Couture","Ryan Halter","Steven Bell","Tim McCarthy",
+  "Kendra Hodgdon","Kevin Couture","Ryan Halter","Steven Bell",
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -423,6 +423,66 @@ function ExpandPanel({ heading, children }) {
     <div style={{padding:"12px 20px 16px 36px"}}>
       <div style={{fontSize:11,fontWeight:700,color:"#7C3AED",letterSpacing:.5,marginBottom:10}}>{heading}</div>
       {children}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  MULTI-SELECT FILTER — searchable checkbox dropdown used across Activity Explorer
+// ─────────────────────────────────────────────────────────────────────────────
+
+function MultiSelectFilter({ label, options, selected, onChange, width=170 }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const ref = useRef(null);
+
+  useEffect(()=>{
+    const onDocClick = e => { if(ref.current && !ref.current.contains(e.target)) { setOpen(false); setSearch(""); } };
+    document.addEventListener("mousedown", onDocClick);
+    return ()=>document.removeEventListener("mousedown", onDocClick);
+  },[]);
+
+  const filtered = search ? options.filter(o=>o.toLowerCase().includes(search.toLowerCase())) : options;
+  const toggle = v => onChange(selected.includes(v) ? selected.filter(x=>x!==v) : [...selected, v]);
+  const active = selected.length>0;
+  const buttonLabel = !active ? `All ${label}` : selected.length===1 ? selected[0] : `${selected.length} ${label} selected`;
+
+  return (
+    <div ref={ref} style={{position:"relative",width}}>
+      <button onClick={()=>setOpen(o=>!o)} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,fontFamily:"'DM Sans',sans-serif",fontSize:13,border:`2px solid ${active?"#011e5c":"#E5E7EB"}`,borderRadius:8,padding:"7px 10px",background:active?"#EEF2FF":"#fff",color:active?"#011e5c":"#374151",cursor:"pointer",fontWeight:active?700:400,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+        <span style={{overflow:"hidden",textOverflow:"ellipsis"}}>{buttonLabel}</span>
+        <span style={{fontSize:10,flexShrink:0,color:active?"#011e5c":"#9CA3AF"}}>▾</span>
+      </button>
+      {open&&(
+        <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,zIndex:200,width:Math.max(width,220),background:"#fff",border:"1px solid #E5E7EB",borderRadius:10,boxShadow:"0 8px 24px rgba(0,0,0,.15)",overflow:"hidden"}}>
+          {options.length>6&&(
+            <div style={{padding:8,borderBottom:"1px solid #F3F4F6"}}>
+              <input autoFocus value={search} onChange={e=>setSearch(e.target.value)} placeholder={`Search ${label.toLowerCase()}…`}
+                style={{width:"100%",fontFamily:"'DM Sans',sans-serif",fontSize:13,border:"1.5px solid #E5E7EB",borderRadius:6,padding:"6px 8px",outline:"none"}}/>
+            </div>
+          )}
+          <div style={{maxHeight:240,overflowY:"auto",padding:"4px 0"}}>
+            {filtered.length===0
+              ?<div style={{padding:"10px 12px",fontSize:13,color:"#9CA3AF"}}>No matches</div>
+              :filtered.map(o=>{
+                const checked=selected.includes(o);
+                return(
+                  <div key={o} onClick={()=>toggle(o)} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 12px",cursor:"pointer",background:checked?"#F5F3FF":"transparent"}}>
+                    <div style={{width:15,height:15,borderRadius:4,border:`2px solid ${checked?"#011e5c":"#D1D5DB"}`,background:checked?"#011e5c":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      {checked&&<span style={{color:"#fff",fontSize:10,fontWeight:900}}>✓</span>}
+                    </div>
+                    <span style={{fontSize:13,color:"#374151",overflow:"hidden",textOverflow:"ellipsis"}}>{o}</span>
+                  </div>
+                );
+              })}
+          </div>
+          {active&&(
+            <div style={{borderTop:"1px solid #F3F4F6",padding:8}}>
+              <button onClick={()=>onChange([])} style={{width:"100%",fontSize:12,fontWeight:600,color:"#EF4444",background:"transparent",border:"none",cursor:"pointer",padding:"4px 0"}}>Clear ({selected.length})</button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -1589,15 +1649,31 @@ function ActivityExplorer({ log, onRemove, onExportView, clubClusters={} }) {
   const [expandedLeague, setExpandedLeague]=useState(null);
   const [expandedDept, setExpandedDept]=useState(null);
   const [expandedStaff, setExpandedStaff]=useState(null);
-  const [staffFilter, setStaffFilter]=useState("all");
-  const [deliverableFilter, setDeliverableFilter]=useState("all");
+  const [staffFilter, setStaffFilter]=useState([]);
+  const [deliverableFilter, setDeliverableFilter]=useState([]);
+  const [clubFilter, setClubFilter]=useState([]);
+  const [leagueFilter, setLeagueFilter]=useState([]);
+  const [typeFilter, setTypeFilter]=useState([]);
+  const [deptFilter, setDeptFilter]=useState([]);
   const [sortMetric, setSortMetric]=useState("value");
 
   const staffOptions = [...new Set(log.map(e=>e.staff))].filter(Boolean).sort();
   const deliverableOptions = [...new Set(log.map(e=>e.name))].filter(Boolean).sort();
+  const clubOptions = [...new Set(log.map(e=>e.club))].filter(Boolean).sort();
+  const leagueOptions = [...new Set(log.map(e=>e.league))].filter(Boolean).sort();
+  const typeOptions = [...new Set(log.map(e=>e.type))].filter(Boolean).sort();
+  const deptOptions = [...new Set(log.map(e=>e.dept))].filter(Boolean).sort();
+
+  const hasActiveFilters = staffFilter.length||deliverableFilter.length||clubFilter.length||leagueFilter.length||typeFilter.length||deptFilter.length;
+  const clearAllFilters = () => { setStaffFilter([]);setDeliverableFilter([]);setClubFilter([]);setLeagueFilter([]);setTypeFilter([]);setDeptFilter([]); };
+
   const filteredLog = log
-    .filter(e=>staffFilter==="all"||e.staff===staffFilter)
-    .filter(e=>deliverableFilter==="all"||e.name===deliverableFilter);
+    .filter(e=>!staffFilter.length||staffFilter.includes(e.staff))
+    .filter(e=>!deliverableFilter.length||deliverableFilter.includes(e.name))
+    .filter(e=>!clubFilter.length||clubFilter.includes(e.club))
+    .filter(e=>!leagueFilter.length||leagueFilter.includes(e.league))
+    .filter(e=>!typeFilter.length||typeFilter.includes(e.type))
+    .filter(e=>!deptFilter.length||deptFilter.includes(e.dept));
 
   const total=filteredLog.reduce((s,e)=>s+e.rate,0);
 
@@ -1686,19 +1762,17 @@ function ActivityExplorer({ log, onRemove, onExportView, clubClusters={} }) {
         <button onClick={()=>onExportView(view,{clubRows,deptRows,staffRows,log:filteredLog})} style={{background:"#0369A1",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:13,cursor:"pointer"}}>⬇ Export This View</button>
       </div>
 
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20,flexWrap:"wrap"}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:20,flexWrap:"wrap"}}>
         <span style={{fontSize:11,fontWeight:700,color:"#9CA3AF",letterSpacing:.5}}>FILTER</span>
-        <select value={staffFilter} onChange={e=>setStaffFilter(e.target.value)} style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,border:`2px solid ${staffFilter!=="all"?"#011e5c":"#E5E7EB"}`,borderRadius:8,padding:"7px 12px",background:"#fff",color:"#111",cursor:"pointer",outline:"none"}}>
-          <option value="all">All Staff</option>
-          {staffOptions.map(s=><option key={s} value={s}>{s}</option>)}
-        </select>
-        <select value={deliverableFilter} onChange={e=>setDeliverableFilter(e.target.value)} style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,border:`2px solid ${deliverableFilter!=="all"?"#011e5c":"#E5E7EB"}`,borderRadius:8,padding:"7px 12px",background:"#fff",color:"#111",cursor:"pointer",outline:"none",maxWidth:260}}>
-          <option value="all">All Deliverables</option>
-          {deliverableOptions.map(d=><option key={d} value={d}>{d}</option>)}
-        </select>
-        {(staffFilter!=="all"||deliverableFilter!=="all")&&(
-          <button onClick={()=>{setStaffFilter("all");setDeliverableFilter("all");}} style={{fontSize:12,fontWeight:600,color:"#EF4444",background:"transparent",border:"1.5px solid #FECACA",borderRadius:8,padding:"6px 12px",cursor:"pointer"}}>Clear filters</button>
-        )}
+        <MultiSelectFilter label="Staff" options={staffOptions} selected={staffFilter} onChange={setStaffFilter} width={150}/>
+        <MultiSelectFilter label="Deliverables" options={deliverableOptions} selected={deliverableFilter} onChange={setDeliverableFilter} width={170}/>
+        <MultiSelectFilter label="Clubs" options={clubOptions} selected={clubFilter} onChange={setClubFilter} width={150}/>
+        <MultiSelectFilter label="Leagues" options={leagueOptions} selected={leagueFilter} onChange={setLeagueFilter} width={140}/>
+        <MultiSelectFilter label="Types" options={typeOptions} selected={typeFilter} onChange={setTypeFilter} width={120}/>
+        <MultiSelectFilter label="Depts" options={deptOptions} selected={deptFilter} onChange={setDeptFilter} width={150}/>
+        {hasActiveFilters?(
+          <button onClick={clearAllFilters} style={{fontSize:12,fontWeight:600,color:"#EF4444",background:"transparent",border:"1.5px solid #FECACA",borderRadius:8,padding:"6px 12px",cursor:"pointer"}}>Clear all filters</button>
+        ):null}
         {SORT_OPTIONS[view]&&(
           <>
             <div style={{width:1,height:20,background:"#E5E7EB",margin:"0 4px"}}/>
