@@ -85,6 +85,14 @@ const DEPT_CONFIG = {
 const ALL_DEPT_NAMES = Object.keys(DEPT_CONFIG);
 const TABS = ["Dashboard", ...ALL_DEPT_NAMES, "Activity Explorer"];
 
+// Shared cluster color palette — used everywhere a cluster gets a color (the Dashboard's
+// Total Deliverables by Cluster chart, the YoY trend card's Cluster compare mode, etc.)
+// so a given cluster is always the same color no matter where you're looking at it.
+const CLUSTER_PALETTE = ["#1D4ED8","#047857","#7C3AED","#B45309","#DB2777","#0891B2","#4338CA","#B91C1C"];
+const clusterColorFrom = (cl, sortedClusterList) => cl==="No Cluster" ? "#9CA3AF" : CLUSTER_PALETTE[sortedClusterList.indexOf(cl) % CLUSTER_PALETTE.length];
+const LEAGUE_ORDER = ["Championship","League One","Premier","Super League","Expansion"];
+const sortByLeagueOrder = (a,b) => { const ia=LEAGUE_ORDER.indexOf(a), ib=LEAGUE_ORDER.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib); };
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1210,14 +1218,14 @@ function DonutChart({ slices, size=220, title, subtitle }) {
         </svg>
       </div>
       {/* Legend */}
-      <div style={{display:"flex",flexDirection:"column",gap:8,flex:1,minWidth:150}}>
+      <div style={{display:"flex",flexDirection:"column",gap:8,width:"fit-content",minWidth:150,maxWidth:230}}>
         {arcs.map((arc,i)=>(
           <div key={i} onMouseEnter={()=>setHovered(i)} onMouseLeave={()=>setHovered(null)}
             style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",padding:"4px 8px",borderRadius:8,background:hovered===i?arc.color+"12":"transparent",transition:"background .15s"}}>
             <div style={{width:12,height:12,borderRadius:"50%",background:arc.color,flexShrink:0}}/>
-            <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,color:"#374151",flex:1}}>{arc.label}</span>
-            <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:700,color:arc.color}}>{(arc.pct*100).toFixed(0)}%</span>
-            <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:"#9CA3AF",width:40,textAlign:"right"}}>{arc.value.toLocaleString()}</span>
+            <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,color:"#374151",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{arc.label}</span>
+            <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:700,color:arc.color,marginLeft:"auto",flexShrink:0}}>{(arc.pct*100).toFixed(0)}%</span>
+            <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:"#9CA3AF",width:34,textAlign:"right",flexShrink:0}}>{arc.value.toLocaleString()}</span>
           </div>
         ))}
       </div>
@@ -1230,28 +1238,26 @@ function DonutChart({ slices, size=220, title, subtitle }) {
 //  dashboard's Period/League/Cluster state so it can always compare across years.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function YoYTrendCard({ log }) {
+function YoYTrendCard({ log, clubClusters }) {
   const [metric, setMetric] = useState("count");
   const [leagueScope, setLeagueScope] = useState("all");
-  const [hiddenYears, setHiddenYears] = useState(new Set());
+  const [compareMode, setCompareMode] = useState("years"); // 'years' | 'clusters' | 'clubs'
+  const [compareYear, setCompareYear] = useState(new Date().getFullYear());
+  const [selectedClusters, setSelectedClusters] = useState([]);
+  const [selectedClubs, setSelectedClubs] = useState([]);
+  const [hiddenKeys, setHiddenKeys] = useState(new Set());
   const [showTable, setShowTable] = useState(false);
 
   const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth();
-  const YEAR_COLORS = ["#94A3B8","#0369A1","#7C3AED","#DB2777","#0891B2","#B45309"];
+  const COMPARE_PALETTE = ["#94A3B8","#0369A1","#7C3AED","#DB2777","#0891B2","#B45309","#047857","#4338CA","#B91C1C","#0F766E"];
 
   const scoped = log.filter(e => leagueScope==="all" || e.league===leagueScope);
   const leagueOptions = [...new Set(log.map(e=>e.league))].filter(Boolean).sort();
-
-  const yearMonthEntries = {};
-  scoped.forEach(e=>{
-    const d=new Date(e.ts), y=d.getFullYear(), m=d.getMonth();
-    if(!yearMonthEntries[y]) yearMonthEntries[y]=Array.from({length:12},()=>[]);
-    yearMonthEntries[y][m].push(e);
-  });
-  const years = Object.keys(yearMonthEntries).map(Number).sort((a,b)=>a-b);
-  const colorForYear = (y,i) => y===currentYear ? "#f51200" : YEAR_COLORS[i % YEAR_COLORS.length];
+  const yearOptions = [...new Set(log.map(e=>new Date(e.ts).getFullYear()))].sort((a,b)=>b-a);
+  const clusterOptions = [...new Set(Object.values(clubClusters))].filter(Boolean).sort();
+  const clubOptions = [...new Set(scoped.map(e=>e.club))].filter(Boolean).sort();
 
   // Same correct methodology as the rest of the dashboard: average each club's own
   // average first, then average those — never a raw sum divided by entity count.
@@ -1270,76 +1276,135 @@ function YoYTrendCard({ log }) {
     if(metric==="value") return entries.reduce((s,e)=>s+getRackRate(e),0);
     return avgIndexForEntries(entries);
   };
-  const seriesForYear = y => (yearMonthEntries[y]||Array.from({length:12},()=>[])).map(metricValue);
-
-  const metricLabel = metric==="count"?"Deliverables":metric==="value"?"Value Delivered":"Avg CPG Index";
   const fmtMetric = v => metric==="value" ? fmt$(Math.round(v)) : metric==="index" ? (v>0?v.toFixed(1):"—") : Math.round(v).toLocaleString();
 
-  const ytdFor = y => {
-    if (!years.includes(y)) return null;
-    const monthEntries = (yearMonthEntries[y]||[]).slice(0,currentMonth+1);
-    const flat = monthEntries.flat();
-    return metric==="index" ? avgIndexForEntries(flat) : (metric==="value" ? flat.reduce((s,e)=>s+getRackRate(e),0) : flat.length);
-  };
-  const thisYTD = ytdFor(currentYear);
-  const lastYTD = ytdFor(currentYear-1);
-  const pctChange = (thisYTD!=null && lastYTD) ? ((thisYTD-lastYTD)/lastYTD*100) : null;
+  // Bucket scoped entries into month-arrays keyed by whichever dimension is being compared.
+  const monthBuckets = {};
+  const pushInto = (key,e) => { if(!monthBuckets[key]) monthBuckets[key]=Array.from({length:12},()=>[]); monthBuckets[key][new Date(e.ts).getMonth()].push(e); };
+  if (compareMode==="years") {
+    scoped.forEach(e=>pushInto(new Date(e.ts).getFullYear(),e));
+  } else if (compareMode==="leagues") {
+    log.filter(e=>new Date(e.ts).getFullYear()===compareYear && e.league).forEach(e=>pushInto(e.league,e));
+  } else if (compareMode==="clusters") {
+    scoped.filter(e=>new Date(e.ts).getFullYear()===compareYear && clubClusters[e.club]).forEach(e=>pushInto(clubClusters[e.club],e));
+  } else {
+    scoped.filter(e=>new Date(e.ts).getFullYear()===compareYear && selectedClubs.includes(e.club)).forEach(e=>pushInto(e.club,e));
+  }
+  const seriesForKey = key => (monthBuckets[key]||Array.from({length:12},()=>[])).map(metricValue);
 
-  const visibleYears = years.filter(y=>!hiddenYears.has(y));
-  const maxVal = Math.max(1, ...visibleYears.flatMap(y=>seriesForYear(y)));
-  const toggleYear = y => setHiddenYears(prev=>{ const n=new Set(prev); n.has(y)?n.delete(y):n.add(y); return n; });
+  let keys = [];
+  if (compareMode==="years") keys = Object.keys(monthBuckets).map(Number).sort((a,b)=>a-b);
+  else if (compareMode==="leagues") keys = Object.keys(monthBuckets).sort(sortByLeagueOrder);
+  else if (compareMode==="clusters") {
+    const present = Object.keys(monthBuckets).sort();
+    keys = selectedClusters.length ? selectedClusters.filter(c=>clusterOptions.includes(c)) : present;
+  } else {
+    keys = selectedClubs;
+  }
+  const colorForKey = (k,i) => {
+    if (compareMode==="years" && k===currentYear) return "#f51200";
+    if (compareMode==="leagues") return LEAGUE_STYLES[k]?.color || COMPARE_PALETTE[i % COMPARE_PALETTE.length];
+    if (compareMode==="clusters") return clusterColorFrom(k, clusterOptions);
+    return COMPARE_PALETTE[i % COMPARE_PALETTE.length];
+  };
+  const toggleKey = k => setHiddenKeys(prev=>{ const n=new Set(prev); n.has(k)?n.delete(k):n.add(k); return n; });
+  const visibleKeys = keys.filter(k=>!hiddenKeys.has(k));
+  const maxVal = Math.max(1, ...visibleKeys.flatMap(k=>seriesForKey(k)));
+
+  // YTD comparison only applies to years mode — there's no "prior period" to compare
+  // against when comparing clusters/teams within a single chosen year.
+  const ytdFor = y => {
+    const yearEntries = scoped.filter(e=>new Date(e.ts).getFullYear()===y && new Date(e.ts).getMonth()<=currentMonth);
+    if (!yearEntries.length && !scoped.some(e=>new Date(e.ts).getFullYear()===y)) return null;
+    return metric==="index" ? avgIndexForEntries(yearEntries) : (metric==="value" ? yearEntries.reduce((s,e)=>s+getRackRate(e),0) : yearEntries.length);
+  };
+  const thisYTD = compareMode==="years" ? ytdFor(currentYear) : null;
+  const lastYTD = compareMode==="years" ? ytdFor(currentYear-1) : null;
+  const pctChange = (thisYTD!=null && lastYTD) ? ((thisYTD-lastYTD)/lastYTD*100) : null;
 
   const W=560, H=190, padL=6, padB=22, padT=8, padR=6;
   const plotW=W-padL-padR, plotH=H-padT-padB;
   const xForMonth = m => padL + (plotW/11)*m;
   const yForVal = v => padT + plotH - (v/maxVal)*plotH;
   const selectStyle={fontFamily:"'DM Sans',sans-serif",fontSize:13,border:"2px solid #E5E7EB",borderRadius:8,padding:"7px 10px",background:"#fff",color:"#111",cursor:"pointer",outline:"none"};
+  const keyLabel = compareMode==="years" ? "Year" : compareMode==="leagues" ? "League" : compareMode==="clusters" ? "Cluster" : "Club";
 
   return (
     <div style={{background:"#fff",border:"1px solid #E5E7EB",borderRadius:16,padding:"24px 28px",boxShadow:"0 1px 6px rgba(0,0,0,.05)"}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:12}}>
-        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:18,color:"#111827"}}>Year-over-Year Trend</div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:12}}>
+        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:18,color:"#111827"}}>
+          {compareMode==="years"?"Year-over-Year Trend":compareMode==="leagues"?`League Comparison — ${compareYear}`:compareMode==="clusters"?`Cluster Comparison — ${compareYear}`:`Team Comparison — ${compareYear}`}
+        </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
           <select value={metric} onChange={e=>setMetric(e.target.value)} style={selectStyle}>
             <option value="count">Deliverables Logged</option>
             <option value="value">Total Value Delivered</option>
             <option value="index">Avg CPG Index</option>
           </select>
-          <select value={leagueScope} onChange={e=>setLeagueScope(e.target.value)} style={selectStyle}>
-            <option value="all">All Leagues</option>
-            {leagueOptions.map(l=><option key={l} value={l}>{l}</option>)}
-          </select>
+          {compareMode!=="leagues"&&(
+            <select value={leagueScope} onChange={e=>setLeagueScope(e.target.value)} style={selectStyle}>
+              <option value="all">All Leagues</option>
+              {leagueOptions.map(l=><option key={l} value={l}>{l}</option>)}
+            </select>
+          )}
         </div>
       </div>
 
-      {years.length===0 ? (
-        <div style={{textAlign:"center",padding:"32px 0",color:"#9CA3AF",fontSize:13}}>No data yet.</div>
+      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:16,paddingBottom:16,borderBottom:"1px solid #F3F4F6"}}>
+        <span style={{fontSize:11,fontWeight:700,color:"#9CA3AF",letterSpacing:.5}}>COMPARE BY</span>
+        {[["years","Years"],["leagues","Leagues"],["clusters","Clusters"],["clubs","Teams"]].map(([v,l])=>(
+          <button key={v} onClick={()=>{setCompareMode(v);setHiddenKeys(new Set());}} style={{padding:"6px 14px",borderRadius:8,border:`1.5px solid ${compareMode===v?"#011e5c":"#E5E7EB"}`,fontFamily:"'DM Sans',sans-serif",fontWeight:compareMode===v?700:400,fontSize:12,cursor:"pointer",background:compareMode===v?"#011e5c":"#fff",color:compareMode===v?"#fff":"#64748B"}}>{l}</button>
+        ))}
+        {compareMode!=="years"&&(
+          <>
+            <div style={{width:1,height:20,background:"#E5E7EB",margin:"0 4px"}}/>
+            <span style={{fontSize:11,fontWeight:700,color:"#9CA3AF",letterSpacing:.5}}>YEAR</span>
+            <select value={compareYear} onChange={e=>setCompareYear(Number(e.target.value))} style={selectStyle}>
+              {yearOptions.map(y=><option key={y} value={y}>{y}</option>)}
+            </select>
+          </>
+        )}
+        {compareMode==="clusters"&&(
+          <MultiSelectFilter label="Clusters" options={clusterOptions} selected={selectedClusters} onChange={setSelectedClusters} width={160}/>
+        )}
+        {compareMode==="clubs"&&(
+          <MultiSelectFilter label="Teams" options={clubOptions} selected={selectedClubs} onChange={setSelectedClubs} width={180}/>
+        )}
+      </div>
+
+      {compareMode==="clubs"&&selectedClubs.length===0 ? (
+        <div style={{textAlign:"center",padding:"32px 0",color:"#9CA3AF",fontSize:13}}>Pick one or more teams above to compare.</div>
+      ) : keys.length===0 ? (
+        <div style={{textAlign:"center",padding:"32px 0",color:"#9CA3AF",fontSize:13}}>No data for this filter.</div>
       ) : (
         <>
-          <div style={{display:"flex",alignItems:"center",gap:16,background:"#F8FAFC",borderRadius:10,padding:"12px 16px",marginBottom:16,flexWrap:"wrap"}}>
-            <div>
-              <div style={{fontSize:10,fontWeight:700,color:"#9CA3AF",letterSpacing:.5}}>{currentYear} YTD (THROUGH {MONTHS_SHORT[currentMonth].toUpperCase()})</div>
-              <div style={{fontSize:22,fontWeight:800,color:"#111827",fontFamily:"'DM Serif Display',serif"}}>{thisYTD!=null?fmtMetric(thisYTD):"—"}</div>
-            </div>
-            {years.includes(currentYear-1)&&(
-              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:12,color:"#6B7280"}}>vs {currentYear-1} YTD: {fmtMetric(lastYTD)}</span>
-                {pctChange!==null&&(
-                  <span style={{fontSize:13,fontWeight:700,color:pctChange>=0?"#047857":"#EF4444",background:pctChange>=0?"#F0FDF4":"#FEF2F2",borderRadius:6,padding:"2px 8px"}}>
-                    {pctChange>=0?"▲":"▼"} {Math.abs(pctChange).toFixed(0)}%
-                  </span>
-                )}
+          {compareMode==="years"&&(
+            <div style={{display:"flex",alignItems:"center",gap:16,background:"#F8FAFC",borderRadius:10,padding:"12px 16px",marginBottom:16,flexWrap:"wrap"}}>
+              <div>
+                <div style={{fontSize:10,fontWeight:700,color:"#9CA3AF",letterSpacing:.5}}>{currentYear} YTD (THROUGH {MONTHS_SHORT[currentMonth].toUpperCase()})</div>
+                <div style={{fontSize:22,fontWeight:800,color:"#111827",fontFamily:"'DM Serif Display',serif"}}>{thisYTD!=null?fmtMetric(thisYTD):"—"}</div>
               </div>
-            )}
-          </div>
+              {keys.includes(currentYear-1)&&(
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:12,color:"#6B7280"}}>vs {currentYear-1} YTD: {fmtMetric(lastYTD)}</span>
+                  {pctChange!==null&&(
+                    <span style={{fontSize:13,fontWeight:700,color:pctChange>=0?"#047857":"#EF4444",background:pctChange>=0?"#F0FDF4":"#FEF2F2",borderRadius:6,padding:"2px 8px"}}>
+                      {pctChange>=0?"▲":"▼"} {Math.abs(pctChange).toFixed(0)}%
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:10}}>
-            {years.map((y,i)=>{
-              const hidden=hiddenYears.has(y);
+            {keys.map((k,i)=>{
+              const hidden=hiddenKeys.has(k);
+              const color=colorForKey(k,i);
               return(
-                <button key={y} onClick={()=>toggleYear(y)} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 10px",borderRadius:20,border:`1.5px solid ${hidden?"#E5E7EB":colorForYear(y,i)}`,background:hidden?"#fff":colorForYear(y,i)+"18",cursor:"pointer",opacity:hidden?.6:1}}>
-                  <div style={{width:8,height:8,borderRadius:"50%",background:colorForYear(y,i)}}/>
-                  <span style={{fontSize:12,fontWeight:600,color:hidden?"#9CA3AF":"#111827"}}>{y}</span>
+                <button key={k} onClick={()=>toggleKey(k)} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 10px",borderRadius:20,border:`1.5px solid ${hidden?"#E5E7EB":color}`,background:hidden?"#fff":color+"18",cursor:"pointer",opacity:hidden?.6:1}}>
+                  <div style={{width:8,height:8,borderRadius:"50%",background:color}}/>
+                  <span style={{fontSize:12,fontWeight:600,color:hidden?"#9CA3AF":"#111827"}}>{k}</span>
                 </button>
               );
             })}
@@ -1352,11 +1417,11 @@ function YoYTrendCard({ log }) {
             {MONTHS_SHORT.map((m,i)=>(
               <text key={m} x={xForMonth(i)} y={H-4} textAnchor="middle" style={{fontSize:9,fill:"#9CA3AF",fontFamily:"'DM Sans',sans-serif"}}>{m}</text>
             ))}
-            {visibleYears.map(y=>{
-              const idx=years.indexOf(y);
-              const points=seriesForYear(y).map((v,m)=>`${xForMonth(m)},${yForVal(v)}`).join(" ");
-              const isCurrent=y===currentYear;
-              return <polyline key={y} points={points} fill="none" stroke={colorForYear(y,idx)} strokeWidth={isCurrent?3:1.5} strokeLinejoin="round" strokeLinecap="round" opacity={isCurrent?1:.7}/>;
+            {visibleKeys.map(k=>{
+              const idx=keys.indexOf(k);
+              const points=seriesForKey(k).map((v,m)=>`${xForMonth(m)},${yForVal(v)}`).join(" ");
+              const isCurrent=compareMode==="years"&&k===currentYear;
+              return <polyline key={k} points={points} fill="none" stroke={colorForKey(k,idx)} strokeWidth={isCurrent?3:1.5} strokeLinejoin="round" strokeLinecap="round" opacity={isCurrent?1:.8}/>;
             })}
           </svg>
 
@@ -1369,15 +1434,15 @@ function YoYTrendCard({ log }) {
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,fontFamily:"'DM Sans',sans-serif"}}>
                 <thead>
                   <tr>
-                    <th style={{padding:"6px 10px",textAlign:"left",fontWeight:700,color:"#6B7280",borderBottom:"1px solid #E5E7EB"}}>Year</th>
+                    <th style={{padding:"6px 10px",textAlign:"left",fontWeight:700,color:"#6B7280",borderBottom:"1px solid #E5E7EB"}}>{keyLabel}</th>
                     {MONTHS_SHORT.map(m=><th key={m} style={{padding:"6px 10px",textAlign:"right",fontWeight:700,color:"#6B7280",borderBottom:"1px solid #E5E7EB"}}>{m}</th>)}
                   </tr>
                 </thead>
                 <tbody>
-                  {years.map((y,i)=>(
-                    <tr key={y} style={{opacity:hiddenYears.has(y)?.4:1}}>
-                      <td style={{padding:"6px 10px",fontWeight:700,color:colorForYear(y,i)}}>{y}</td>
-                      {seriesForYear(y).map((v,m)=><td key={m} style={{padding:"6px 10px",textAlign:"right",color:"#374151"}}>{v>0?fmtMetric(v):"—"}</td>)}
+                  {keys.map((k,i)=>(
+                    <tr key={k} style={{opacity:hiddenKeys.has(k)?.4:1}}>
+                      <td style={{padding:"6px 10px",fontWeight:700,color:colorForKey(k,i)}}>{k}</td>
+                      {seriesForKey(k).map((v,m)=><td key={m} style={{padding:"6px 10px",textAlign:"right",color:"#374151"}}>{v>0?fmtMetric(v):"—"}</td>)}
                     </tr>
                   ))}
                 </tbody>
@@ -1399,8 +1464,8 @@ function ValueByClusterCard({ log, clubClusters }) {
   const [metricMode, setMetricMode] = useState("total"); // 'total' | 'avg'
   const [leagueFilter, setLeagueFilter] = useState("all");
   const [hiddenDepts, setHiddenDepts] = useState(new Set());
+  const [hover, setHover] = useState(null); // {x,y,dept,value,league,cluster,year}
 
-  const LEAGUE_ORDER = ["Championship","League One","Premier","Super League","Expansion"];
   const toggleDept = d => setHiddenDepts(prev=>{ const n=new Set(prev); n.has(d)?n.delete(d):n.add(d); return n; });
 
   // Only external, club-attributed, cluster-assigned entries make sense on this chart.
@@ -1417,10 +1482,7 @@ function ValueByClusterCard({ log, clubClusters }) {
     bucket.clubs.add(e.club);
   });
 
-  const leaguesPresent = Object.keys(tree).sort((a,b)=>{
-    const ia=LEAGUE_ORDER.indexOf(a), ib=LEAGUE_ORDER.indexOf(b);
-    return (ia<0?99:ia)-(ib<0?99:ib);
-  });
+  const leaguesPresent = Object.keys(tree).sort(sortByLeagueOrder);
 
   // Flatten into left-to-right bars, tracking group spans for the two-level axis labels.
   const bars = [];
@@ -1510,7 +1572,7 @@ function ValueByClusterCard({ log, clubClusters }) {
             })}
           </div>
 
-          <div style={{overflowX:"auto"}}>
+          <div style={{position:"relative",overflowX:"auto"}}>
             <svg width={chartW} height={chartH+70} style={{display:"block"}}>
               {[0,.25,.5,.75,1].map(f=>(
                 <g key={f}>
@@ -1528,7 +1590,17 @@ function ValueByClusterCard({ log, clubClusters }) {
                       const h=(v/maxTotal)*chartH;
                       const y=yCursor-h;
                       yCursor=y;
-                      return <rect key={d} x={b.x} y={y} width={barW} height={h} fill={DEPT_CONFIG[d]?.color||"#6B7280"}/>;
+                      const isHovered = hover && hover.x===b.x && hover.dept===d;
+                      return (
+                        <rect key={d} x={b.x} y={y} width={barW} height={h}
+                          fill={DEPT_CONFIG[d]?.color||"#6B7280"}
+                          stroke={isHovered?"#111827":"none"} strokeWidth={isHovered?1.5:0}
+                          opacity={hover&&!isHovered?.6:1}
+                          style={{cursor:"pointer",transition:"opacity .1s"}}
+                          onMouseEnter={()=>setHover({x:b.x,y,dept:d,value:v,league:b.league,cluster:b.cluster,year:b.year})}
+                          onMouseLeave={()=>setHover(null)}
+                        />
+                      );
                     })}
                     <text x={b.x+barW/2} y={padT+chartH+13} textAnchor="middle" style={{fontSize:9,fill:"#6B7280",fontFamily:"'DM Sans',sans-serif"}}>{b.year}</text>
                   </g>
@@ -1541,6 +1613,16 @@ function ValueByClusterCard({ log, clubClusters }) {
                 <text key={i} x={(ls.x1+ls.x2)/2} y={padT+chartH+44} textAnchor="middle" style={{fontSize:10,fontWeight:700,fill:"#011e5c",fontFamily:"'DM Sans',sans-serif"}}>{ls.league}</text>
               ))}
             </svg>
+            {hover&&(
+              <div style={{position:"absolute",left:hover.x+barW/2,top:hover.y,transform:"translate(-50%,-100%)",marginTop:-8,background:"#111827",color:"#fff",borderRadius:8,padding:"8px 12px",fontSize:12,fontFamily:"'DM Sans',sans-serif",whiteSpace:"nowrap",pointerEvents:"none",boxShadow:"0 4px 16px rgba(0,0,0,.25)",zIndex:10}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,fontWeight:700,marginBottom:2}}>
+                  <div style={{width:8,height:8,borderRadius:2,background:DEPT_CONFIG[hover.dept]?.color||"#6B7280"}}/>
+                  {hover.dept}
+                </div>
+                <div style={{fontSize:14,fontWeight:800}}>{fmt$(Math.round(hover.value))}</div>
+                <div style={{fontSize:11,color:"#9CA3AF",marginTop:2}}>{hover.cluster} · {hover.league} · {hover.year}</div>
+              </div>
+            )}
           </div>
         </>
       )}
@@ -1658,9 +1740,8 @@ function Dashboard({ log, onExport, clubsByLeague, clubClusters }) {
     return { label:l, value:leagueEntries.length, color:LEAGUE_COLORS[l], sub };
   }).filter(d=>d.value>0);
 
-  const CLUSTER_PALETTE = ["#1D4ED8","#047857","#7C3AED","#B45309","#DB2777","#0891B2","#4338CA","#B91C1C"];
   const CLUSTER_BUCKETS = [...clusterList, "No Cluster"];
-  const clusterColor = cl => cl==="No Cluster" ? "#9CA3AF" : CLUSTER_PALETTE[clusterList.indexOf(cl) % CLUSTER_PALETTE.length];
+  const clusterColor = cl => clusterColorFrom(cl, clusterList);
   const matchesCluster = (e,cl) => cl==="No Cluster" ? !clubClusters[e.club] : clubClusters[e.club]===cl;
 
   const byCluster = CLUSTER_BUCKETS.map(cl=>{
@@ -1889,12 +1970,12 @@ function Dashboard({ log, onExport, clubsByLeague, clubClusters }) {
       </div>
 
       {/* Row 2: Vertical pie + Year-over-Year Trend */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1.6fr",gap:16}}>
+      <div style={{display:"grid",gridTemplateColumns:"minmax(280px,340px) 1fr",gap:16}}>
         <Card title={`CPG Engagement by Vertical${league!=="all"?` — ${league}`:""}`}>
-          {byDept.length>0?<DonutChart slices={byDept} size={220} title={`${leagueFiltered.length}`} subtitle="deliverables"/>:
+          {byDept.length>0?<DonutChart slices={byDept} size={170} title={`${leagueFiltered.length}`} subtitle="deliverables"/>:
             <div style={{textAlign:"center",padding:"32px 0",color:"#9CA3AF",fontSize:13}}>No data for this filter.</div>}
         </Card>
-        <YoYTrendCard log={log}/>
+        <YoYTrendCard log={log} clubClusters={clubClusters}/>
       </div>
 
       {/* Row 2b: Value by Cluster */}
