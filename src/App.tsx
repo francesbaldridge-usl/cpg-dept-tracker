@@ -42,7 +42,7 @@ async function dbDelete(ids) {
 
 const STAFF = [
   "Amita Singh","Frances Baldridge","Garrett Mitchell","Julian Crockett",
-  "Kendra Hodgdon","Kevin Couture","Ryan Halter","Steven Bell","Tim McCarthy",
+  "Kendra Hodgdon","Kevin Couture","Ryan Halter","Steven Bell",
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -67,7 +67,6 @@ const INTERNAL_RECIPIENTS = {
   "Marketing":           ["HQ Marketing / Comms","Expansion","Onboarding"],
   "Consumer Products":   ["Miscellaneous","Onboarding"],
   "Ticketing":           ["Miscellaneous","League Operations","Onboarding"],
-  "Youth / Facilities":  ["League Operations","League Initiatives"],
   "League Initiatives":  ["League Operations"],
 };
 
@@ -80,7 +79,6 @@ const DEPT_CONFIG = {
   "Marketing":          { color:"#0369A1", light:"#F0F9FF", border:"#BAE6FD", emoji:"📣", hasToggle:true  },
   "Consumer Products":  { color:"#B45309", light:"#FFFBEB", border:"#FDE68A", emoji:"🛍️", hasToggle:true  },
   "Ticketing":          { color:"#047857", light:"#F0FDF4", border:"#A7F3D0", emoji:"🎟️", hasToggle:true  },
-  "Youth / Facilities": { color:"#0891B2", light:"#ECFEFF", border:"#A5F3FC", emoji:"⚽", hasToggle:true  },
   "League Initiatives": { color:"#4338CA", light:"#EEF2FF", border:"#C7D2FE", emoji:"🏛️", hasToggle:false },
 };
 
@@ -96,7 +94,6 @@ const fmt$ = n => "$" + Number(n).toLocaleString();
 function normalizeDept(dept) {
   const MAP = {
     "Corporate Partnerships":"Corp Partnerships","Corp. Partnerships":"Corp Partnerships",
-    "Youth_Facilities":"Youth / Facilities","Youth/Facilities":"Youth / Facilities",
     "Institutional Strategy":"League Initiatives",
   };
   return MAP[String(dept).trim()] || String(dept).trim();
@@ -187,19 +184,6 @@ const FALLBACK_DEPT_ITEMS = {
     internal:[
       {name:"Ticketing Advisory",rate:75,cat:"Advisory",index_score:1,recurring:true,examples:["Ticketing check-in","Advisory call"]},
       {name:"Ticketing Check-In Call",rate:75,cat:"Advisory",index_score:1,recurring:true,examples:["Weekly check-in","Status update call"]},
-    ],
-  },
-  "Youth / Facilities": {
-    external:[
-      {name:"Youth Program Analysis",rate:1500,cat:"Analysis",index_score:3,recurring:false,examples:["Academy program review","Youth league audit"]},
-      {name:"Facilities Assessment",rate:2000,cat:"Analysis",index_score:3,recurring:false,examples:["Facility condition report","Standards compliance review"]},
-      {name:"Youth Strategy Deck",rate:2500,cat:"Strategy",index_score:4,recurring:false,examples:["Academy strategy plan","Youth development roadmap"]},
-      {name:"Facilities Feasibility Study",rate:3000,cat:"Analysis",index_score:4,recurring:false,examples:["New facility feasibility","Site evaluation report"]},
-      {name:"Facilities Asset Valuation",rate:4000,cat:"Valuation",index_score:4,recurring:false,examples:["Facility valuation","Asset financial model"]},
-      {name:"Facilities Revenue Strategy",rate:3500,cat:"Strategy",index_score:4,recurring:false,examples:["Revenue generation plan","Sponsorship integration"]},
-    ],
-    internal:[
-      {name:"Youth / Facilities Advisory",rate:75,cat:"Advisory",index_score:1,recurring:true,examples:["Advisory call","Check-in session"]},
     ],
   },
   "League Initiatives": {
@@ -1091,21 +1075,7 @@ const RACK_RATE_MAP = {
   "Custom Ticketing Model Build": 3000,
   "Ticketing Check-In Call": 75,
   "Ticketing Playbook / Framework": 1500,
-  // Youth / Facilities
-  "Youth Program Analysis": 1500,
-  "Facilities Assessment": 2000,
-  "Youth Strategy Deck": 2500,
   "Strategic Planning Session": 750,
-  "Club Assessment Report": 1500,
-  "Market Research Study": 2000,
-  "Facilities Benchmarking Report": 1500,
-  "Facilities Feasibility Study": 3000,
-  "Facilities Asset Valuation": 4000,
-  "Facilities Revenue Strategy": 3500,
-  "Youth Programming Design": 2000,
-  "Academy Staffing & Operations Plan": 1500,
-  "Community Engagement Strategy": 1000,
-  "Fan & Volunteer Development Program": 750,
   // Default
   "default": 250,
 };
@@ -1235,7 +1205,7 @@ function Dashboard({ log, onExport, clubsByLeague, clubClusters }) {
 
   const LEAGUES = ["all","Championship","League One","Super League","Expansion"];
   const LEAGUE_COLORS = {"Championship":"#b28350","League One":"#00becc","Super League":"#ff8533","Expansion":"#B45309","all":"#011e5c"};
-  const DEPT_COLORS = {"Corp Partnerships":"#7C3AED","Marketing":"#0369A1","Consumer Products":"#B45309","Ticketing":"#047857","Youth / Facilities":"#0891B2","League Initiatives":"#4338CA","General":"#475569"};
+  const DEPT_COLORS = {"Corp Partnerships":"#7C3AED","Marketing":"#0369A1","Consumer Products":"#B45309","Ticketing":"#047857","League Initiatives":"#4338CA","General":"#475569"};
   const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const availableYears = [...new Set((log||[]).map(e=>new Date(e.ts).getFullYear()))].sort((a,b)=>b-a);
 
@@ -2158,7 +2128,6 @@ const NAV_ITEMS = [
   { id:"Marketing",          label:"Marketing",          emoji:"📣",  group:"dept" },
   { id:"Consumer Products",  label:"Consumer Products",  emoji:"🛍️",  group:"dept" },
   { id:"Ticketing",          label:"Ticketing",          emoji:"🎟️",  group:"dept" },
-  { id:"Youth / Facilities", label:"Youth / Facilities", emoji:"⚽",  group:"dept" },
   { id:"League Initiatives", label:"League Initiatives", emoji:"🏛️",  group:"dept" },
 ];
 
@@ -2220,6 +2189,11 @@ function AppNav({ activeTab, setActiveTab, loading }) {
 }
 
 
+// Staff no longer tracked in dashboards/reporting — their historical rows stay in the
+// Google Sheet untouched (pull them directly there if ever needed), just excluded here.
+const RETIRED_STAFF = ["Tim McCarthy"];
+const excludeRetiredStaff = data => data.filter(e => !RETIRED_STAFF.includes(e.staff));
+
 export default function App() {
   const [unlocked,      setUnlocked]      = useState(()=>sessionStorage.getItem("dept_unlocked")==="1");
   const [activeTab,     setActiveTab]     = useState("Dashboard");
@@ -2237,7 +2211,7 @@ export default function App() {
         dbFetchDeliverables().catch(()=>[]),
         dbFetchClubs().catch(()=>[]),
       ]);
-      setLog(logData);
+      setLog(excludeRetiredStaff(logData));
       if(delivData.length) {
         const built = buildDeptItems(delivData);
         // Only use sheet data if it actually produced items for known depts
@@ -2255,7 +2229,7 @@ export default function App() {
     if(!unlocked) return;
     loadAll();
     const interval=setInterval(()=>{
-      dbFetch().then(setLog).catch(()=>{});
+      dbFetch().then(d=>setLog(excludeRetiredStaff(d))).catch(()=>{});
     },15000);
     return()=>clearInterval(interval);
   },[unlocked,loadAll]);
