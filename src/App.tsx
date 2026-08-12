@@ -60,7 +60,7 @@ const FALLBACK_CLUBS = {
 //  INTERNAL RECIPIENTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-const LEAGUE_TIER_OPTIONS = ["Championship","League One","Premier","Super League","Expansion"];
+const LEAGUE_TIER_OPTIONS = ["Championship","League One","Premier","Super League","Expansion","USL HQ"];
 
 const INTERNAL_RECIPIENTS = {
   "Corp Partnerships":   ["HQ Corp Partnerships","League Operations"],
@@ -79,7 +79,7 @@ const DEPT_CONFIG = {
   "Marketing":          { color:"#0369A1", light:"#F0F9FF", border:"#BAE6FD", emoji:"📣", hasToggle:true  },
   "Consumer Products":  { color:"#B45309", light:"#FFFBEB", border:"#FDE68A", emoji:"🛍️", hasToggle:true  },
   "Ticketing":          { color:"#047857", light:"#F0FDF4", border:"#A7F3D0", emoji:"🎟️", hasToggle:true  },
-  "League Initiatives": { color:"#4338CA", light:"#EEF2FF", border:"#C7D2FE", emoji:"🏛️", hasToggle:false },
+  "League Initiatives": { color:"#4338CA", light:"#EEF2FF", border:"#C7D2FE", emoji:"🏛️", hasToggle:true },
 };
 
 const ALL_DEPT_NAMES = Object.keys(DEPT_CONFIG);
@@ -187,6 +187,12 @@ const FALLBACK_DEPT_ITEMS = {
     ],
   },
   "League Initiatives": {
+    external:[
+      {name:"Cluster Calls",rate:150,cat:"Calls & Consultancy",index_score:2,recurring:true,examples:["Cluster check-in call","Cluster-wide update call"]},
+      {name:"Cluster Reports",rate:500,cat:"Partnerships Analysis",index_score:3,recurring:true,examples:["Quarterly cluster report","Cluster performance summary"]},
+      {name:"Year End Recap Report",rate:1500,cat:"Partnerships Analysis",index_score:4,recurring:false,examples:["Annual league recap","Season-end summary report"]},
+      {name:"Broadcast Reports",rate:500,cat:"Partnerships Analysis",index_score:3,recurring:true,examples:["Monthly broadcast metrics","Broadcast performance recap"]},
+    ],
     internal:[
       {name:"Leadership Briefing",rate:500,cat:"Strategy",index_score:4,recurring:false,examples:["Executive briefing","Board presentation"]},
       {name:"Strategic Planning Session",rate:750,cat:"Strategy",index_score:4,recurring:false,examples:["League strategy session","Annual planning meeting"]},
@@ -198,14 +204,20 @@ const FALLBACK_DEPT_ITEMS = {
 
 // Normalize the flat fallback items into the same {name,cat,leagueSelect,subcategories:[...]}
 // shape buildDeptItems() produces, so DeptTab/CategoryGroupedCards never have to branch on source.
+// League Initiatives external deliverables attributed to whole leagues (or USL HQ),
+// not individual clubs — same name-match approach as the Social Media Report leagueSelect flag.
+const MULTI_LEAGUE_ITEMS = ["Cluster Calls","Cluster Reports","Year End Recap Report","Broadcast Reports"];
+const isMultiLeagueItem = (dept,name) => dept==="League Initiatives" && MULTI_LEAGUE_ITEMS.includes(name);
+
 (function normalizeFallback(){
-  Object.values(FALLBACK_DEPT_ITEMS).forEach(dept=>{
+  Object.entries(FALLBACK_DEPT_ITEMS).forEach(([dept,modes])=>{
     ["external","internal"].forEach(mode=>{
-      if (!dept[mode]) return;
-      dept[mode] = dept[mode].map(item=>({
+      if (!modes[mode]) return;
+      modes[mode] = modes[mode].map(item=>({
         name: item.name,
         cat: item.cat,
         leagueSelect: !!item.leagueSelect,
+        multiLeagueSelect: isMultiLeagueItem(dept,item.name),
         subcategories: [{
           subcat: item.name,
           rate: item.rate,
@@ -229,6 +241,7 @@ function buildDeptItems(deliverables) {
     const isRecurring = String(d.recurring||"").toLowerCase() === "true";
     const cat = String(d.cat||d.category||"Other").trim();
     const leagueSelect = name==="Social Media Report" && dept==="Marketing";
+    const multiLeagueSelect = isMultiLeagueItem(dept,name);
     const subEntry = {
       subcat:      String(d.subcat||"").trim() || name,
       rate:        Number(d.rate)||0,
@@ -240,7 +253,7 @@ function buildDeptItems(deliverables) {
     const isBoth = t.includes("external") && t.includes("internal");
     const modes = isBoth ? ["external","internal"] : (t==="internal" ? ["internal"] : ["external"]);
     modes.forEach(mode=>{
-      if (!map[dept][mode][name]) map[dept][mode][name] = { name, cat, leagueSelect, subcategories:[] };
+      if (!map[dept][mode][name]) map[dept][mode][name] = { name, cat, leagueSelect, multiLeagueSelect, subcategories:[] };
       map[dept][mode][name].subcategories.push({...subEntry});
     });
   });
@@ -485,12 +498,15 @@ function ExternalModal({ item, deptCfg, clubsByLeague, onConfirm, onCancel }) {
   const [chosenLeague, setChosenLeague]= useState("");
   const [chosenClubs,  setChosenClubs] = useState([]);
   const [chosenClub,   setChosenClub]  = useState("");
+  const [chosenTiers,  setChosenTiers] = useState([]);
   const [singleSearch, setSingleSearch]= useState("");
   const [multiSearch,  setMultiSearch] = useState("");
   const [notes,        setNotes]       = useState("");
 
   const allFlat = Object.entries(clubsByLeague).flatMap(([league,clubs])=>clubs.map(club=>({club,league})));
+  const toggleTier = l => setChosenTiers(prev=>prev.includes(l)?prev.filter(x=>x!==l):[...prev,l]);
   const getEntries = () => {
+    if (item.multiLeagueSelect) return chosenTiers.map(l=>({club:l,league:l}));
     if (selection==="all")    return allFlat;
     if (selection==="league") return chosenLeague?(clubsByLeague[chosenLeague]||[]).map(club=>({club,league:chosenLeague})):[];
     if (selection==="multi")  return chosenClubs.map(club=>({club,league:leagueForClub(club,clubsByLeague)}));
@@ -523,6 +539,25 @@ function ExternalModal({ item, deptCfg, clubsByLeague, onConfirm, onCancel }) {
         <div style={{fontSize:13,color:"#6B7280",marginBottom:20}}>{item.name} · <strong>{fmt$(item.rate)} each</strong>{item.recurring&&<span style={{marginLeft:8}}><RecurringBadge/></span>}</div>
         <label style={{display:"block",fontSize:12,fontWeight:700,color:"#6B7280",letterSpacing:.5,marginBottom:10}}>ATTRIBUTE TO</label>
 
+        {item.multiLeagueSelect?(
+          <div style={{marginBottom:8}}>
+            <div style={{fontSize:12,color:"#6B7280",marginBottom:10}}>This is league-wide work, not club-specific — select one or more leagues (or USL HQ). One entry is logged per selection.</div>
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              {LEAGUE_TIER_OPTIONS.map(l=>{
+                const checked=chosenTiers.includes(l);
+                return(
+                  <div key={l} onClick={()=>toggleTier(l)} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px",cursor:"pointer",border:`2px solid ${checked?deptCfg.color:"#E5E7EB"}`,borderRadius:8,background:checked?deptCfg.light:"#fff"}}>
+                    <div style={{width:16,height:16,borderRadius:4,border:`2px solid ${checked?deptCfg.color:"#D1D5DB"}`,background:checked?deptCfg.color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      {checked&&<span style={{color:"#fff",fontSize:11,fontWeight:900}}>✓</span>}
+                    </div>
+                    <span style={{fontSize:14,fontWeight:600,color:"#111827"}}>{l}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ):(
+        <>
         <OBox id="single" title="🏟️ Specific Club" sub="Log for one individual club">
           {chosenClub?(
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:deptCfg.light,border:`1.5px solid ${deptCfg.color}`,borderRadius:8,padding:"9px 12px"}}>
@@ -595,6 +630,8 @@ function ExternalModal({ item, deptCfg, clubsByLeague, onConfirm, onCancel }) {
             ))}
           </div>
         </OBox>
+        </>
+        )}
 
         {count>0&&(
           <div style={{background:deptCfg.light,border:`1px solid ${deptCfg.border}`,borderRadius:10,padding:"12px 14px",marginBottom:4}}>
@@ -958,6 +995,7 @@ function DeptTab({ dept, log, onLog, onBulkLog, onBulkComplete, deptItems, clubs
           name: items[modal].subcategories.length>1 ? `${items[modal].name} — ${sub.subcat}` : items[modal].name,
           cat: items[modal].cat,
           leagueSelect: items[modal].leagueSelect,
+          multiLeagueSelect: items[modal].multiLeagueSelect,
           rate: sub.rate,
           index_score: sub.index_score,
           recurring: sub.recurring,
@@ -1183,6 +1221,329 @@ function DonutChart({ slices, size=220, title, subtitle }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  YEAR-OVER-YEAR TREND — self-contained filters, independent of the main
+//  dashboard's Period/League/Cluster state so it can always compare across years.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function YoYTrendCard({ log }) {
+  const [metric, setMetric] = useState("count");
+  const [leagueScope, setLeagueScope] = useState("all");
+  const [hiddenYears, setHiddenYears] = useState(new Set());
+  const [showTable, setShowTable] = useState(false);
+
+  const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth();
+  const YEAR_COLORS = ["#94A3B8","#0369A1","#7C3AED","#DB2777","#0891B2","#B45309"];
+
+  const scoped = log.filter(e => leagueScope==="all" || e.league===leagueScope);
+  const leagueOptions = [...new Set(log.map(e=>e.league))].filter(Boolean).sort();
+
+  const yearMonthEntries = {};
+  scoped.forEach(e=>{
+    const d=new Date(e.ts), y=d.getFullYear(), m=d.getMonth();
+    if(!yearMonthEntries[y]) yearMonthEntries[y]=Array.from({length:12},()=>[]);
+    yearMonthEntries[y][m].push(e);
+  });
+  const years = Object.keys(yearMonthEntries).map(Number).sort((a,b)=>a-b);
+  const colorForYear = (y,i) => y===currentYear ? "#f51200" : YEAR_COLORS[i % YEAR_COLORS.length];
+
+  // Same correct methodology as the rest of the dashboard: average each club's own
+  // average first, then average those — never a raw sum divided by entity count.
+  const avgIndexForEntries = entries => {
+    const perClub={};
+    entries.filter(e=>!e.recurring&&e.type==="External").forEach(e=>{
+      const c=e.club||"Unknown";
+      if(!perClub[c]) perClub[c]={sum:0,count:0};
+      perClub[c].sum+=Number(e.index_score||1); perClub[c].count++;
+    });
+    const avgs=Object.values(perClub).map(c=>c.sum/c.count);
+    return avgs.length ? avgs.reduce((s,v)=>s+v,0)/avgs.length : 0;
+  };
+  const metricValue = entries => {
+    if(metric==="count") return entries.length;
+    if(metric==="value") return entries.reduce((s,e)=>s+getRackRate(e),0);
+    return avgIndexForEntries(entries);
+  };
+  const seriesForYear = y => (yearMonthEntries[y]||Array.from({length:12},()=>[])).map(metricValue);
+
+  const metricLabel = metric==="count"?"Deliverables":metric==="value"?"Value Delivered":"Avg CPG Index";
+  const fmtMetric = v => metric==="value" ? fmt$(Math.round(v)) : metric==="index" ? (v>0?v.toFixed(1):"—") : Math.round(v).toLocaleString();
+
+  const ytdFor = y => {
+    if (!years.includes(y)) return null;
+    const monthEntries = (yearMonthEntries[y]||[]).slice(0,currentMonth+1);
+    const flat = monthEntries.flat();
+    return metric==="index" ? avgIndexForEntries(flat) : (metric==="value" ? flat.reduce((s,e)=>s+getRackRate(e),0) : flat.length);
+  };
+  const thisYTD = ytdFor(currentYear);
+  const lastYTD = ytdFor(currentYear-1);
+  const pctChange = (thisYTD!=null && lastYTD) ? ((thisYTD-lastYTD)/lastYTD*100) : null;
+
+  const visibleYears = years.filter(y=>!hiddenYears.has(y));
+  const maxVal = Math.max(1, ...visibleYears.flatMap(y=>seriesForYear(y)));
+  const toggleYear = y => setHiddenYears(prev=>{ const n=new Set(prev); n.has(y)?n.delete(y):n.add(y); return n; });
+
+  const W=560, H=190, padL=6, padB=22, padT=8, padR=6;
+  const plotW=W-padL-padR, plotH=H-padT-padB;
+  const xForMonth = m => padL + (plotW/11)*m;
+  const yForVal = v => padT + plotH - (v/maxVal)*plotH;
+  const selectStyle={fontFamily:"'DM Sans',sans-serif",fontSize:13,border:"2px solid #E5E7EB",borderRadius:8,padding:"7px 10px",background:"#fff",color:"#111",cursor:"pointer",outline:"none"};
+
+  return (
+    <div style={{background:"#fff",border:"1px solid #E5E7EB",borderRadius:16,padding:"24px 28px",boxShadow:"0 1px 6px rgba(0,0,0,.05)"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:12}}>
+        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:18,color:"#111827"}}>Year-over-Year Trend</div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <select value={metric} onChange={e=>setMetric(e.target.value)} style={selectStyle}>
+            <option value="count">Deliverables Logged</option>
+            <option value="value">Total Value Delivered</option>
+            <option value="index">Avg CPG Index</option>
+          </select>
+          <select value={leagueScope} onChange={e=>setLeagueScope(e.target.value)} style={selectStyle}>
+            <option value="all">All Leagues</option>
+            {leagueOptions.map(l=><option key={l} value={l}>{l}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {years.length===0 ? (
+        <div style={{textAlign:"center",padding:"32px 0",color:"#9CA3AF",fontSize:13}}>No data yet.</div>
+      ) : (
+        <>
+          <div style={{display:"flex",alignItems:"center",gap:16,background:"#F8FAFC",borderRadius:10,padding:"12px 16px",marginBottom:16,flexWrap:"wrap"}}>
+            <div>
+              <div style={{fontSize:10,fontWeight:700,color:"#9CA3AF",letterSpacing:.5}}>{currentYear} YTD (THROUGH {MONTHS_SHORT[currentMonth].toUpperCase()})</div>
+              <div style={{fontSize:22,fontWeight:800,color:"#111827",fontFamily:"'DM Serif Display',serif"}}>{thisYTD!=null?fmtMetric(thisYTD):"—"}</div>
+            </div>
+            {years.includes(currentYear-1)&&(
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:12,color:"#6B7280"}}>vs {currentYear-1} YTD: {fmtMetric(lastYTD)}</span>
+                {pctChange!==null&&(
+                  <span style={{fontSize:13,fontWeight:700,color:pctChange>=0?"#047857":"#EF4444",background:pctChange>=0?"#F0FDF4":"#FEF2F2",borderRadius:6,padding:"2px 8px"}}>
+                    {pctChange>=0?"▲":"▼"} {Math.abs(pctChange).toFixed(0)}%
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:10}}>
+            {years.map((y,i)=>{
+              const hidden=hiddenYears.has(y);
+              return(
+                <button key={y} onClick={()=>toggleYear(y)} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 10px",borderRadius:20,border:`1.5px solid ${hidden?"#E5E7EB":colorForYear(y,i)}`,background:hidden?"#fff":colorForYear(y,i)+"18",cursor:"pointer",opacity:hidden?.6:1}}>
+                  <div style={{width:8,height:8,borderRadius:"50%",background:colorForYear(y,i)}}/>
+                  <span style={{fontSize:12,fontWeight:600,color:hidden?"#9CA3AF":"#111827"}}>{y}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{overflow:"visible"}}>
+            {[0,.25,.5,.75,1].map(f=>(
+              <line key={f} x1={padL} x2={W-padR} y1={padT+plotH*(1-f)} y2={padT+plotH*(1-f)} stroke="#F3F4F6" strokeWidth={1}/>
+            ))}
+            {MONTHS_SHORT.map((m,i)=>(
+              <text key={m} x={xForMonth(i)} y={H-4} textAnchor="middle" style={{fontSize:9,fill:"#9CA3AF",fontFamily:"'DM Sans',sans-serif"}}>{m}</text>
+            ))}
+            {visibleYears.map(y=>{
+              const idx=years.indexOf(y);
+              const points=seriesForYear(y).map((v,m)=>`${xForMonth(m)},${yForVal(v)}`).join(" ");
+              const isCurrent=y===currentYear;
+              return <polyline key={y} points={points} fill="none" stroke={colorForYear(y,idx)} strokeWidth={isCurrent?3:1.5} strokeLinejoin="round" strokeLinecap="round" opacity={isCurrent?1:.7}/>;
+            })}
+          </svg>
+
+          <button onClick={()=>setShowTable(s=>!s)} style={{marginTop:12,fontSize:12,fontWeight:600,color:"#0369A1",background:"transparent",border:"none",cursor:"pointer",padding:0}}>
+            {showTable?"Hide":"Show"} monthly data table {showTable?"▲":"▼"}
+          </button>
+
+          {showTable&&(
+            <div style={{marginTop:12,overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,fontFamily:"'DM Sans',sans-serif"}}>
+                <thead>
+                  <tr>
+                    <th style={{padding:"6px 10px",textAlign:"left",fontWeight:700,color:"#6B7280",borderBottom:"1px solid #E5E7EB"}}>Year</th>
+                    {MONTHS_SHORT.map(m=><th key={m} style={{padding:"6px 10px",textAlign:"right",fontWeight:700,color:"#6B7280",borderBottom:"1px solid #E5E7EB"}}>{m}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {years.map((y,i)=>(
+                    <tr key={y} style={{opacity:hiddenYears.has(y)?.4:1}}>
+                      <td style={{padding:"6px 10px",fontWeight:700,color:colorForYear(y,i)}}>{y}</td>
+                      {seriesForYear(y).map((v,m)=><td key={m} style={{padding:"6px 10px",textAlign:"right",color:"#374151"}}>{v>0?fmtMetric(v):"—"}</td>)}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  VALUE BY CLUSTER — nested League → Cluster → Year stacked bars, segments by
+//  department. Self-contained filters, same pattern as the YoY trend card.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ValueByClusterCard({ log, clubClusters }) {
+  const [metricMode, setMetricMode] = useState("total"); // 'total' | 'avg'
+  const [leagueFilter, setLeagueFilter] = useState("all");
+  const [hiddenDepts, setHiddenDepts] = useState(new Set());
+
+  const LEAGUE_ORDER = ["Championship","League One","Premier","Super League","Expansion"];
+  const toggleDept = d => setHiddenDepts(prev=>{ const n=new Set(prev); n.has(d)?n.delete(d):n.add(d); return n; });
+
+  // Only external, club-attributed, cluster-assigned entries make sense on this chart.
+  const scoped = log.filter(e=>e.type==="External" && e.club && clubClusters[e.club] && (leagueFilter==="all"||e.league===leagueFilter));
+
+  const tree = {}; // league -> cluster -> year -> { byDept:{}, clubs:Set }
+  scoped.forEach(e=>{
+    const league = e.league||"Unknown", cluster = clubClusters[e.club], year = new Date(e.ts).getFullYear();
+    if(!tree[league]) tree[league]={};
+    if(!tree[league][cluster]) tree[league][cluster]={};
+    if(!tree[league][cluster][year]) tree[league][cluster][year]={byDept:{},clubs:new Set()};
+    const bucket = tree[league][cluster][year];
+    bucket.byDept[e.dept] = (bucket.byDept[e.dept]||0) + getRackRate(e);
+    bucket.clubs.add(e.club);
+  });
+
+  const leaguesPresent = Object.keys(tree).sort((a,b)=>{
+    const ia=LEAGUE_ORDER.indexOf(a), ib=LEAGUE_ORDER.indexOf(b);
+    return (ia<0?99:ia)-(ib<0?99:ib);
+  });
+
+  // Flatten into left-to-right bars, tracking group spans for the two-level axis labels.
+  const bars = [];
+  leaguesPresent.forEach(league=>{
+    const clusters = Object.keys(tree[league]).sort();
+    clusters.forEach(cluster=>{
+      const years = Object.keys(tree[league][cluster]).map(Number).sort((a,b)=>a-b);
+      years.forEach(year=>{
+        const bucket = tree[league][cluster][year];
+        const clubCount = bucket.clubs.size||1;
+        const byDept = {};
+        Object.entries(bucket.byDept).forEach(([d,v])=>{ byDept[d] = metricMode==="avg" ? v/clubCount : v; });
+        bars.push({ league, cluster, year, byDept });
+      });
+    });
+  });
+
+  const deptsPresent = [...new Set(bars.flatMap(b=>Object.keys(b.byDept)))];
+  const visibleDepts = deptsPresent.filter(d=>!hiddenDepts.has(d));
+  const barTotal = b => visibleDepts.reduce((s,d)=>s+(b.byDept[d]||0),0);
+  const maxTotal = Math.max(1, ...bars.map(barTotal));
+
+  // Geometry
+  const barW=34, barGap=6, clusterGap=18, leagueGap=32, chartH=260, padT=16, padL=54;
+  let x = padL;
+  const positioned = bars.map((b,i)=>{
+    const prev = bars[i-1];
+    if (prev) {
+      if (prev.cluster!==b.cluster || prev.league!==b.league) x += (prev.league!==b.league ? leagueGap : clusterGap);
+      else x += barGap;
+    }
+    const pos = { ...b, x };
+    x += barW;
+    return pos;
+  });
+  const chartW = x + 20;
+
+  // Group spans for cluster/league labels
+  const clusterSpans=[], leagueSpans=[];
+  positioned.forEach(b=>{
+    const cs = clusterSpans[clusterSpans.length-1];
+    if (cs && cs.league===b.league && cs.cluster===b.cluster) { cs.x2=b.x+barW; }
+    else clusterSpans.push({ league:b.league, cluster:b.cluster, x1:b.x, x2:b.x+barW });
+    const ls = leagueSpans[leagueSpans.length-1];
+    if (ls && ls.league===b.league) { ls.x2=b.x+barW; }
+    else leagueSpans.push({ league:b.league, x1:b.x, x2:b.x+barW });
+  });
+
+  const yForVal = v => padT + chartH - (v/maxTotal)*chartH;
+  const fmtAxis = v => v>=1000 ? `$${Math.round(v/1000)}K` : `$${Math.round(v)}`;
+  const selectStyle={fontFamily:"'DM Sans',sans-serif",fontSize:13,border:"2px solid #E5E7EB",borderRadius:8,padding:"7px 10px",background:"#fff",color:"#111",cursor:"pointer",outline:"none"};
+  const leagueOptions = [...new Set(log.map(e=>e.league))].filter(Boolean).sort();
+
+  return (
+    <div style={{background:"#fff",border:"1px solid #E5E7EB",borderRadius:16,padding:"24px 28px",boxShadow:"0 1px 6px rgba(0,0,0,.05)"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6,flexWrap:"wrap",gap:12}}>
+        <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+          <div style={{fontFamily:"'DM Serif Display',serif",fontSize:18,color:"#111827"}}>Value Delivered by Cluster</div>
+          <span style={{fontSize:11,fontWeight:700,color:"#4338CA",background:"#EEF2FF",border:"1px solid #C7D2FE",borderRadius:20,padding:"2px 10px"}}>{metricMode==="avg"?"Average per club":"Total"}</span>
+        </div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <select value={metricMode} onChange={e=>setMetricMode(e.target.value)} style={selectStyle}>
+            <option value="total">Total Value</option>
+            <option value="avg">Avg Value per Club</option>
+          </select>
+          <select value={leagueFilter} onChange={e=>setLeagueFilter(e.target.value)} style={selectStyle}>
+            <option value="all">All Leagues</option>
+            {leagueOptions.map(l=><option key={l} value={l}>{l}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {bars.length===0 ? (
+        <div style={{textAlign:"center",padding:"32px 0",color:"#9CA3AF",fontSize:13}}>No cluster-assigned club data for this filter.</div>
+      ) : (
+        <>
+          <div style={{display:"flex",flexWrap:"wrap",gap:8,margin:"14px 0"}}>
+            {deptsPresent.map(d=>{
+              const hidden=hiddenDepts.has(d);
+              const color=DEPT_CONFIG[d]?.color||"#6B7280";
+              return(
+                <button key={d} onClick={()=>toggleDept(d)} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 10px",borderRadius:20,border:`1.5px solid ${hidden?"#E5E7EB":color}`,background:hidden?"#fff":color+"18",cursor:"pointer",opacity:hidden?.6:1}}>
+                  <div style={{width:8,height:8,borderRadius:2,background:color}}/>
+                  <span style={{fontSize:12,fontWeight:600,color:hidden?"#9CA3AF":"#111827"}}>{d}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div style={{overflowX:"auto"}}>
+            <svg width={chartW} height={chartH+70} style={{display:"block"}}>
+              {[0,.25,.5,.75,1].map(f=>(
+                <g key={f}>
+                  <line x1={padL-6} x2={chartW-16} y1={padT+chartH*(1-f)} y2={padT+chartH*(1-f)} stroke="#F3F4F6" strokeWidth={1}/>
+                  <text x={padL-12} y={padT+chartH*(1-f)+3} textAnchor="end" style={{fontSize:9,fill:"#9CA3AF",fontFamily:"'DM Sans',sans-serif"}}>{fmtAxis(maxTotal*f)}</text>
+                </g>
+              ))}
+              {positioned.map((b,i)=>{
+                let yCursor=padT+chartH;
+                return (
+                  <g key={i}>
+                    {visibleDepts.map(d=>{
+                      const v=b.byDept[d]||0;
+                      if(!v) return null;
+                      const h=(v/maxTotal)*chartH;
+                      const y=yCursor-h;
+                      yCursor=y;
+                      return <rect key={d} x={b.x} y={y} width={barW} height={h} fill={DEPT_CONFIG[d]?.color||"#6B7280"}/>;
+                    })}
+                    <text x={b.x+barW/2} y={padT+chartH+13} textAnchor="middle" style={{fontSize:9,fill:"#6B7280",fontFamily:"'DM Sans',sans-serif"}}>{b.year}</text>
+                  </g>
+                );
+              })}
+              {clusterSpans.map((cs,i)=>(
+                <text key={i} x={(cs.x1+cs.x2)/2} y={padT+chartH+28} textAnchor="middle" style={{fontSize:10,fontWeight:700,fill:"#374151",fontFamily:"'DM Sans',sans-serif"}}>{cs.cluster}</text>
+              ))}
+              {leagueSpans.map((ls,i)=>(
+                <text key={i} x={(ls.x1+ls.x2)/2} y={padT+chartH+44} textAnchor="middle" style={{fontSize:10,fontWeight:700,fill:"#011e5c",fontFamily:"'DM Sans',sans-serif"}}>{ls.league}</text>
+              ))}
+            </svg>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -1527,11 +1888,17 @@ function Dashboard({ log, onExport, clubsByLeague, clubClusters }) {
         </Card>
       </div>
 
-      {/* Row 2: Vertical pie */}
-      <Card title={`CPG Engagement by Vertical${league!=="all"?` — ${league}`:""}`}>
-        {byDept.length>0?<DonutChart slices={byDept} size={220} title={`${leagueFiltered.length}`} subtitle="deliverables"/>:
-          <div style={{textAlign:"center",padding:"32px 0",color:"#9CA3AF",fontSize:13}}>No data for this filter.</div>}
-      </Card>
+      {/* Row 2: Vertical pie + Year-over-Year Trend */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1.6fr",gap:16}}>
+        <Card title={`CPG Engagement by Vertical${league!=="all"?` — ${league}`:""}`}>
+          {byDept.length>0?<DonutChart slices={byDept} size={220} title={`${leagueFiltered.length}`} subtitle="deliverables"/>:
+            <div style={{textAlign:"center",padding:"32px 0",color:"#9CA3AF",fontSize:13}}>No data for this filter.</div>}
+        </Card>
+        <YoYTrendCard log={log}/>
+      </div>
+
+      {/* Row 2b: Value by Cluster */}
+      <ValueByClusterCard log={log} clubClusters={clubClusters}/>
 
       {/* Row 3: Top Clubs / Recipients */}
       <Card
