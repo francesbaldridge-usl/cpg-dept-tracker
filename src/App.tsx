@@ -501,6 +501,22 @@ function Toast({ msg, color, onDone }) {
 //  EXTERNAL MODAL
 // ─────────────────────────────────────────────────────────────────────────────
 
+// A stable, top-level component (not redefined inside ExternalModal's render body).
+// It used to be defined inline as "OBox" inside ExternalModal — meaning React saw a
+// brand-new component type on every keystroke in the club search box, remounting the
+// whole subtree (including the input itself) and dropping focus after every letter.
+function SelectionBox({ id, title, sub, selection, onSelect, deptCfg, children }) {
+  return (
+    <div onClick={()=>onSelect(id)} style={{border:`2px solid ${selection===id?deptCfg.color:"#E5E7EB"}`,borderRadius:10,padding:"12px 14px",marginBottom:8,cursor:"pointer",background:selection===id?deptCfg.light:"#fff"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <div style={{width:16,height:16,borderRadius:"50%",border:`2px solid ${selection===id?deptCfg.color:"#D1D5DB"}`,background:selection===id?deptCfg.color:"#fff",flexShrink:0}}/>
+        <div><div style={{fontWeight:700,fontSize:14,color:"#111827"}}>{title}</div><div style={{fontSize:12,color:"#6B7280"}}>{sub}</div></div>
+      </div>
+      {selection===id&&children&&<div style={{marginTop:10}}>{children}</div>}
+    </div>
+  );
+}
+
 function ExternalModal({ item, deptCfg, clubsByLeague, onConfirm, onCancel }) {
   const [selection,    setSelection]   = useState("single");
   const [chosenLeague, setChosenLeague]= useState("");
@@ -530,16 +546,6 @@ function ExternalModal({ item, deptCfg, clubsByLeague, onConfirm, onCancel }) {
     league, multiSearch ? clubs.filter(c=>c.toLowerCase().includes(multiSearch.toLowerCase())) : clubs
   ]).filter(([,clubs])=>clubs.length>0);
 
-  const OBox=({id,title,sub,children})=>(
-    <div onClick={()=>setSelection(id)} style={{border:`2px solid ${selection===id?deptCfg.color:"#E5E7EB"}`,borderRadius:10,padding:"12px 14px",marginBottom:8,cursor:"pointer",background:selection===id?deptCfg.light:"#fff"}}>
-      <div style={{display:"flex",alignItems:"center",gap:10}}>
-        <div style={{width:16,height:16,borderRadius:"50%",border:`2px solid ${selection===id?deptCfg.color:"#D1D5DB"}`,background:selection===id?deptCfg.color:"#fff",flexShrink:0}}/>
-        <div><div style={{fontWeight:700,fontSize:14,color:"#111827"}}>{title}</div><div style={{fontSize:12,color:"#6B7280"}}>{sub}</div></div>
-      </div>
-      {selection===id&&children&&<div style={{marginTop:10}}>{children}</div>}
-    </div>
-  );
-
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,.55)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <div style={{background:"#fff",borderRadius:16,padding:"28px 28px 24px",width:"100%",maxWidth:500,boxShadow:"0 24px 64px rgba(0,0,0,.22)",fontFamily:"'DM Sans',sans-serif",maxHeight:"90vh",overflowY:"auto"}}>
@@ -566,7 +572,7 @@ function ExternalModal({ item, deptCfg, clubsByLeague, onConfirm, onCancel }) {
           </div>
         ):(
         <>
-        <OBox id="single" title="🏟️ Specific Club" sub="Log for one individual club">
+        <SelectionBox id="single" title="🏟️ Specific Club" sub="Log for one individual club" selection={selection} onSelect={setSelection} deptCfg={deptCfg}>
           {chosenClub?(
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:deptCfg.light,border:`1.5px solid ${deptCfg.color}`,borderRadius:8,padding:"9px 12px"}}>
               <span style={{fontSize:14,fontWeight:700,color:"#111827"}}>{chosenClub}</span>
@@ -590,9 +596,9 @@ function ExternalModal({ item, deptCfg, clubsByLeague, onConfirm, onCancel }) {
               )}
             </>
           )}
-        </OBox>
+        </SelectionBox>
 
-        <OBox id="multi" title="✅ Multiple Clubs" sub="Pick two or more specific clubs">
+        <SelectionBox id="multi" title="✅ Multiple Clubs" sub="Pick two or more specific clubs" selection={selection} onSelect={setSelection} deptCfg={deptCfg}>
           <input type="text" value={multiSearch} onChange={e=>setMultiSearch(e.target.value)} onClick={e=>e.stopPropagation()}
             placeholder="Search clubs…" style={searchStyle}/>
           <div style={{marginTop:8,maxHeight:220,overflowY:"auto",border:`1px solid ${deptCfg.border}`,borderRadius:8,padding:"4px 0"}}>
@@ -613,9 +619,9 @@ function ExternalModal({ item, deptCfg, clubsByLeague, onConfirm, onCancel }) {
             ))}
           </div>
           {chosenClubs.length>0&&<div style={{fontSize:12,color:deptCfg.color,fontWeight:600,marginTop:6}}>{chosenClubs.length} club{chosenClubs.length>1?"s":""} selected</div>}
-        </OBox>
+        </SelectionBox>
 
-        <OBox id="league" title="📋 Entire League" sub="Logs one line item per club in that league">
+        <SelectionBox id="league" title="📋 Entire League" sub="Logs one line item per club in that league" selection={selection} onSelect={setSelection} deptCfg={deptCfg}>
           <select value={chosenLeague} onChange={e=>setChosenLeague(e.target.value)} style={ss}>
             <option value="">Select a league…</option>
             {Object.keys(clubsByLeague).map(l=><option key={l} value={l}>{l} — {clubsByLeague[l].length} clubs</option>)}
@@ -626,9 +632,9 @@ function ExternalModal({ item, deptCfg, clubsByLeague, onConfirm, onCancel }) {
               <div style={{display:"flex",flexWrap:"wrap",gap:4}}>{(clubsByLeague[chosenLeague]||[]).map(c=><span key={c} style={{fontSize:11,background:"#fff",border:"1px solid #E5E7EB",borderRadius:6,padding:"2px 7px"}}>{c}</span>)}</div>
             </div>
           )}
-        </OBox>
+        </SelectionBox>
 
-        <OBox id="all" title="🌐 All Clubs" sub={`Logs one line item for every club (${allFlat.length} total)`}>
+        <SelectionBox id="all" title="🌐 All Clubs" sub={`Logs one line item for every club (${allFlat.length} total)`} selection={selection} onSelect={setSelection} deptCfg={deptCfg}>
           <div style={{background:"#F8FAFC",borderRadius:8,padding:"10px 12px"}}>
             {Object.entries(clubsByLeague).map(([league,clubs])=>(
               <div key={league} style={{marginBottom:6}}>
@@ -637,7 +643,7 @@ function ExternalModal({ item, deptCfg, clubsByLeague, onConfirm, onCancel }) {
               </div>
             ))}
           </div>
-        </OBox>
+        </SelectionBox>
         </>
         )}
 
@@ -670,6 +676,138 @@ function ExternalModal({ item, deptCfg, clubsByLeague, onConfirm, onCancel }) {
 // ─────────────────────────────────────────────────────────────────────────────
 //  INTERNAL MODAL
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  BATCH LOG MODAL — multiple deliverables, one shared club/recipient + notes
+// ─────────────────────────────────────────────────────────────────────────────
+
+function BatchLogModal({ selection, activeMode, dept, deptCfg, clubsByLeague, onConfirm, onCancel }) {
+  const [subcatChoices, setSubcatChoices] = useState(() => {
+    const initial = {};
+    selection.forEach(({idx,item}) => { if(item.subcategories.length===1) initial[idx]=item.subcategories[0]; });
+    return initial;
+  });
+  const [chosenClub, setChosenClub] = useState("");
+  const [clubSearch, setClubSearch] = useState("");
+  const [recipient, setRecipient] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const allFlat = Object.entries(clubsByLeague).flatMap(([league,clubs])=>clubs.map(club=>({club,league})));
+  const clubMatches = clubSearch ? allFlat.filter(({club})=>club.toLowerCase().includes(clubSearch.toLowerCase())) : [];
+  const recipients = INTERNAL_RECIPIENTS[dept]||[];
+
+  const allSubcatsChosen = selection.every(({idx})=>subcatChoices[idx]);
+  const attributionChosen = activeMode==="internal" ? !!recipient : !!chosenClub;
+  const canConfirm = allSubcatsChosen && attributionChosen;
+
+  const totalValue = selection.reduce((s,{idx})=>{
+    const sub = subcatChoices[idx];
+    return s + (sub && activeMode==="external" ? sub.rate : 0);
+  },0);
+
+  const handleConfirmClick = () => {
+    if (!canConfirm) return;
+    const club = activeMode==="internal" ? recipient : chosenClub;
+    const league = activeMode==="internal" ? "Internal" : leagueForClub(chosenClub,clubsByLeague);
+    const finalEntries = selection.map(({idx,item})=>{
+      const sub = subcatChoices[idx];
+      return {
+        dept, name:item.name, subcat:sub.subcat,
+        rate: activeMode==="internal" ? 0 : sub.rate,
+        type: activeMode==="internal"?"Internal":"External",
+        cat:item.cat, index_score:sub.index_score||1, recurring:sub.recurring||false,
+        club, league, notes,
+      };
+    });
+    onConfirm(finalEntries);
+  };
+
+  const ss={width:"100%",fontFamily:"'DM Sans',sans-serif",fontSize:14,border:`2px solid ${deptCfg.color}`,borderRadius:8,padding:"9px 12px",background:"#fff",color:"#111",cursor:"text",outline:"none"};
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,.55)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div style={{background:"#fff",borderRadius:16,padding:"28px 28px 24px",width:"100%",maxWidth:520,boxShadow:"0 24px 64px rgba(0,0,0,.22)",fontFamily:"'DM Sans',sans-serif",maxHeight:"90vh",overflowY:"auto"}}>
+        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:19,color:"#111827",marginBottom:4}}>Log {selection.length} Deliverables</div>
+        <div style={{fontSize:13,color:"#6B7280",marginBottom:20}}>All logged to the same {activeMode==="internal"?"recipient":"club"}, with one shared note.</div>
+
+        <label style={{display:"block",fontSize:12,fontWeight:700,color:"#6B7280",letterSpacing:.5,marginBottom:10}}>SELECTED DELIVERABLES</label>
+        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:20}}>
+          {selection.map(({idx,item})=>(
+            <div key={idx} style={{border:"1.5px solid #E5E7EB",borderRadius:10,padding:"10px 12px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
+                <span style={{fontWeight:700,fontSize:13,color:"#111827"}}>{item.name}</span>
+                {activeMode==="external"&&subcatChoices[idx]&&<span style={{fontSize:12,fontWeight:700,color:deptCfg.color}}>{fmt$(subcatChoices[idx].rate)}</span>}
+              </div>
+              {item.subcategories.length>1&&(
+                <select value={subcatChoices[idx]?.subcat||""} onChange={e=>{
+                  const sub=item.subcategories.find(s=>s.subcat===e.target.value);
+                  setSubcatChoices(prev=>({...prev,[idx]:sub}));
+                }} style={{...ss,marginTop:8,fontSize:13,padding:"7px 10px"}}>
+                  <option value="" disabled>Select type…</option>
+                  {item.subcategories.map(s=><option key={s.subcat} value={s.subcat}>{s.subcat} {activeMode==="external"?`— ${fmt$(s.rate)}`:""}</option>)}
+                </select>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <label style={{display:"block",fontSize:12,fontWeight:700,color:"#6B7280",letterSpacing:.5,marginBottom:10}}>{activeMode==="internal"?"INTERNAL RECIPIENT":"CLUB"}</label>
+        {activeMode==="internal"?(
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
+            {recipients.map(r=>(
+              <div key={r} onClick={()=>setRecipient(r)} style={{border:`2px solid ${recipient===r?deptCfg.color:"#E5E7EB"}`,borderRadius:10,padding:"12px 14px",cursor:"pointer",background:recipient===r?deptCfg.light:"#fff",display:"flex",alignItems:"center",gap:10}}>
+                <div style={{width:16,height:16,borderRadius:"50%",border:`2px solid ${recipient===r?deptCfg.color:"#D1D5DB"}`,background:recipient===r?deptCfg.color:"#fff",flexShrink:0}}/>
+                <span style={{fontWeight:600,fontSize:14,color:"#111827"}}>{r}</span>
+              </div>
+            ))}
+          </div>
+        ):(
+          <div style={{marginBottom:16}}>
+            {chosenClub?(
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:deptCfg.light,border:`1.5px solid ${deptCfg.color}`,borderRadius:8,padding:"9px 12px"}}>
+                <span style={{fontSize:14,fontWeight:700,color:"#111827"}}>{chosenClub}</span>
+                <span onClick={()=>{setChosenClub("");setClubSearch("");}} style={{cursor:"pointer",color:"#6B7280",fontSize:13,fontWeight:700}}>✕</span>
+              </div>
+            ):(
+              <>
+                <input type="text" value={clubSearch} onChange={e=>setClubSearch(e.target.value)} placeholder="Type to search clubs…" style={ss}/>
+                {clubSearch&&(
+                  <div style={{marginTop:6,maxHeight:180,overflowY:"auto",border:`1px solid ${deptCfg.border}`,borderRadius:8}}>
+                    {clubMatches.length===0
+                      ?<div style={{padding:"10px 12px",fontSize:13,color:"#9CA3AF"}}>No clubs match "{clubSearch}"</div>
+                      :clubMatches.map(({club,league})=>(
+                        <div key={club} onClick={()=>setChosenClub(club)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",cursor:"pointer",borderBottom:"1px solid #F3F4F6"}}>
+                          <span style={{fontSize:13,color:"#374151"}}>{club}</span>
+                          <LeagueBadge league={league}/>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {activeMode==="external"&&totalValue>0&&(
+          <div style={{background:deptCfg.light,border:`1px solid ${deptCfg.border}`,borderRadius:10,padding:"10px 14px",marginBottom:16}}>
+            <div style={{fontSize:13,fontWeight:700,color:deptCfg.color}}>{selection.length} deliverables · {fmt$(totalValue)} total</div>
+          </div>
+        )}
+
+        <label style={{display:"block",fontSize:12,fontWeight:700,color:"#6B7280",letterSpacing:.5,marginBottom:6}}>NOTES <span style={{fontWeight:400,color:"#9CA3AF"}}>(applies to all {selection.length})</span></label>
+        <textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Any additional context for this batch…" rows={2}
+          style={{width:"100%",fontFamily:"'DM Sans',sans-serif",fontSize:13,border:"1.5px solid #E5E7EB",borderRadius:8,padding:"9px 12px",outline:"none",resize:"vertical",color:"#374151",background:"#FAFAFA"}}/>
+
+        <div style={{display:"flex",gap:10,marginTop:16}}>
+          <button onClick={handleConfirmClick} disabled={!canConfirm} style={{flex:1,padding:11,border:"none",borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:14,color:"#fff",background:canConfirm?deptCfg.color:"#D1D5DB",cursor:canConfirm?"pointer":"not-allowed"}}>
+            Log {selection.length} Entries ▶
+          </button>
+          <button onClick={onCancel} style={{padding:"11px 18px",border:"1.5px solid #E5E7EB",borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:600,fontSize:14,color:"#6B7280",background:"#fff",cursor:"pointer"}}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function InternalModal({ item, deptCfg, dept, clubsByLeague, onConfirm, onCancel }) {
   const [recipient,      setRecipient]     = useState("");
@@ -797,7 +935,7 @@ function SubcategoryPickerModal({ item, deptCfg, onSelect, onCancel }) {
 //  CATEGORY GROUPED CARDS
 // ─────────────────────────────────────────────────────────────────────────────
 
-function CategoryGroupedCards({ items, log, dept, cfg, pulsingIdx, onLogClick }) {
+function CategoryGroupedCards({ items, log, dept, cfg, pulsingIdx, onLogClick, batchSelected, onToggleBatch }) {
   const [collapsed, setCollapsed] = useState({});
   const groups=[], seen={};
   items.forEach((item,idx)=>{
@@ -844,10 +982,21 @@ function CategoryGroupedCards({ items, log, dept, cfg, pulsingIdx, onLogClick })
                     ? subs.map(s=>s.subcat).join(" · ")
                     : (subs[0]?.examples||[]).slice(0,4).join(" · ");
                   const teaserExtra = multi ? 0 : Math.max(0,(subs[0]?.examples?.length||0)-4);
+                  // Items that need special multi-target attribution (league-wide social,
+                  // League Ops tiers) don't fit the "one shared attribution" batch flow.
+                  const batchEligible = !item.leagueSelect && !item.multiLeagueSelect;
+                  const isChecked = batchSelected && batchSelected.includes(idx);
                   return(
-                    <div key={item.name} style={{background:"#fff",border:`1.5px solid ${isPulsing?cfg.color:"#E5E7EB"}`,borderRadius:12,padding:16,display:"flex",flexDirection:"column",gap:8,boxShadow:isPulsing?`0 0 0 4px ${cfg.color}33`:"0 1px 4px rgba(0,0,0,.06)",transition:"border-color .2s,box-shadow .2s"}}>
+                    <div key={item.name} style={{background:"#fff",border:`1.5px solid ${isPulsing?cfg.color:isChecked?cfg.color:"#E5E7EB"}`,borderRadius:12,padding:16,display:"flex",flexDirection:"column",gap:8,boxShadow:isPulsing?`0 0 0 4px ${cfg.color}33`:isChecked?`0 0 0 3px ${cfg.color}33`:"0 1px 4px rgba(0,0,0,.06)",transition:"border-color .2s,box-shadow .2s"}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
-                        <span style={{fontFamily:"'DM Serif Display',serif",fontSize:15,color:"#111827",lineHeight:1.3,flex:1}}>{item.name}</span>
+                        <div style={{display:"flex",alignItems:"flex-start",gap:8,flex:1}}>
+                          {batchEligible&&onToggleBatch&&(
+                            <div onClick={()=>onToggleBatch(idx)} style={{width:16,height:16,borderRadius:4,border:`2px solid ${isChecked?cfg.color:"#D1D5DB"}`,background:isChecked?cfg.color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,cursor:"pointer",marginTop:2}}>
+                              {isChecked&&<span style={{color:"#fff",fontSize:10,fontWeight:900}}>✓</span>}
+                            </div>
+                          )}
+                          <span style={{fontFamily:"'DM Serif Display',serif",fontSize:15,color:"#111827",lineHeight:1.3,flex:1}}>{item.name}</span>
+                        </div>
                         {allRecurring&&<RecurringBadge/>}
                       </div>
                       {teaser&&(
@@ -893,10 +1042,17 @@ function DeptTab({ dept, log, onLog, onBulkLog, onBulkComplete, deptItems, clubs
   const [selectedSubcat,setSelectedSubcat]=useState(null);
   const [modal,setModal]=useState(null);
   const [pulsingIdx,setPulsingIdx]=useState(null);
+  const [batchSelected,setBatchSelected]=useState([]);
+  const [showBatchModal,setShowBatchModal]=useState(false);
 
   const deptData=deptItems[dept]||{external:[],internal:[]};
   const activeMode=isIntOnly?"internal":mode;
   const items=activeMode==="internal"?deptData.internal:deptData.external;
+  // Internal work never shows a price on the browsing cards either — the write path
+  // already forces $0 regardless, this just keeps what's displayed consistent with that.
+  const displayItems = activeMode==="internal"
+    ? items.map(it=>({...it, subcategories: it.subcategories.map(s=>({...s,rate:0}))}))
+    : items;
   const deptLog=log.filter(e=>e.dept===dept);
   const deptTotal=deptLog.reduce((s,e)=>s+e.rate,0);
 
@@ -917,15 +1073,18 @@ function DeptTab({ dept, log, onLog, onBulkLog, onBulkComplete, deptItems, clubs
   const handleConfirm=async (entries, notes="")=>{
     const item=items[modal];
     const sub=selectedSubcat||item.subcategories[0];
+    // Internal work never carries a dollar figure — enforced here at write time so the
+    // sheet itself stays clean, not just masked by the app's display layer.
+    const rate = activeMode==="internal" ? 0 : sub.rate;
     setModal(null);setSelectedSubcat(null);setPulsingIdx(modal);setTimeout(()=>setPulsingIdx(null),400);
     const total=entries.length;
     if(total===1){
       const{club,league}=entries[0];
-      await onLog({dept,name:item.name,subcat:sub.subcat,rate:sub.rate,type:activeMode==="internal"?"Internal":"External",cat:item.cat,index_score:sub.index_score||1,recurring:sub.recurring||false,staff:staffName,club,league,notes,bulkSilent:false});
+      await onLog({dept,name:item.name,subcat:sub.subcat,rate,type:activeMode==="internal"?"Internal":"External",cat:item.cat,index_score:sub.index_score||1,recurring:sub.recurring||false,staff:staffName,club,league,notes,bulkSilent:false});
     } else {
       // Build all entries first, add to UI optimistically, then send as one batch request
       const newEntries = entries.map(({club,league})=>({
-        dept,name:item.name,subcat:sub.subcat,rate:sub.rate,
+        dept,name:item.name,subcat:sub.subcat,rate,
         type:activeMode==="internal"?"Internal":"External",
         cat:item.cat,index_score:sub.index_score||1,
         recurring:sub.recurring||false,staff:staffName,club,league,notes,
@@ -940,8 +1099,34 @@ function DeptTab({ dept, log, onLog, onBulkLog, onBulkComplete, deptItems, clubs
       } catch(err) {
         console.error("Batch insert failed:", err);
       }
-      onBulkComplete(total, item.name, sub.rate*total);
+      onBulkComplete(total, item.name, rate*total);
     }
+  };
+
+  const toggleBatchSelect = idx => {
+    if(!staffName){setNameErr(true);return;}
+    setNameErr(false);
+    setBatchSelected(prev => prev.includes(idx) ? prev.filter(i=>i!==idx) : [...prev,idx]);
+  };
+
+  const handleBatchConfirm = async finalEntries => {
+    setShowBatchModal(false);
+    setBatchSelected([]);
+    const newEntries = finalEntries.map(e=>({
+      ...e, staff:staffName,
+      id:`${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      ts:Date.now(),
+    }));
+    onBulkLog(newEntries);
+    try {
+      await dbInsertBatch(newEntries);
+    } catch(err) {
+      console.error("Batch insert failed:", err);
+    }
+    const total = newEntries.reduce((s,e)=>s+e.rate,0);
+    const uniqueNames = [...new Set(newEntries.map(e=>e.name))];
+    const label = uniqueNames.length<=2 ? uniqueNames.join(", ") : `${uniqueNames.length} deliverable types`;
+    onBulkComplete(newEntries.length, label, total);
   };
 
   return(
@@ -960,7 +1145,7 @@ function DeptTab({ dept, log, onLog, onBulkLog, onBulkComplete, deptItems, clubs
         {isToggle&&(
           <div style={{display:"flex",background:"#F1F5F9",borderRadius:10,padding:3,gap:2}}>
             {["external","internal"].map(m=>(
-              <button key={m} onClick={()=>setMode(m)} style={{padding:"7px 16px",borderRadius:8,border:"none",fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:12,cursor:"pointer",background:activeMode===m?cfg.color:"transparent",color:activeMode===m?"#fff":"#64748B",transition:"all .15s"}}>
+              <button key={m} onClick={()=>{setMode(m);setBatchSelected([]);}} style={{padding:"7px 16px",borderRadius:8,border:"none",fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:12,cursor:"pointer",background:activeMode===m?cfg.color:"transparent",color:activeMode===m?"#fff":"#64748B",transition:"all .15s"}}>
                 {m==="external"?"External":"Internal"}
               </button>
             ))}
@@ -990,11 +1175,33 @@ function DeptTab({ dept, log, onLog, onBulkLog, onBulkComplete, deptItems, clubs
 
       {items.length===0
         ?<div style={{textAlign:"center",padding:"40px 0",color:"#9CA3AF",fontFamily:"'DM Sans',sans-serif"}}>No {activeMode} deliverables found — check your Google Sheet.</div>
-        :<CategoryGroupedCards items={items} log={log} dept={dept} cfg={cfg} pulsingIdx={pulsingIdx} onLogClick={handleLogClick}/>
+        :<CategoryGroupedCards items={displayItems} log={log} dept={dept} cfg={cfg} pulsingIdx={pulsingIdx} onLogClick={handleLogClick} batchSelected={batchSelected} onToggleBatch={toggleBatchSelect}/>
       }
 
+      {batchSelected.length>0&&(
+        <div style={{position:"sticky",bottom:20,marginTop:20,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,background:"#011e5c",borderRadius:12,padding:"12px 20px",boxShadow:"0 8px 24px rgba(0,0,0,.25)"}}>
+          <span style={{color:"#fff",fontSize:14,fontWeight:600}}>{batchSelected.length} deliverable{batchSelected.length>1?"s":""} selected</span>
+          <div style={{display:"flex",gap:10}}>
+            <button onClick={()=>setBatchSelected([])} style={{background:"transparent",border:"1.5px solid #3B5A94",color:"#C7D2FE",borderRadius:8,padding:"8px 16px",fontFamily:"'DM Sans',sans-serif",fontWeight:600,fontSize:13,cursor:"pointer"}}>Clear</button>
+            <button onClick={()=>setShowBatchModal(true)} style={{background:"#f51200",border:"none",color:"#fff",borderRadius:8,padding:"8px 18px",fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:13,cursor:"pointer"}}>Log Selected ▶</button>
+          </div>
+        </div>
+      )}
+
+      {showBatchModal&&(
+        <BatchLogModal
+          selection={batchSelected.map(idx=>({idx,item:items[idx]}))}
+          activeMode={activeMode} dept={dept} deptCfg={cfg} clubsByLeague={clubsByLeague}
+          onConfirm={handleBatchConfirm} onCancel={()=>setShowBatchModal(false)}
+        />
+      )}
+
       {subcatPick!==null&&(
-        <SubcategoryPickerModal item={items[subcatPick]} deptCfg={cfg} onSelect={handleSubcatSelect} onCancel={()=>setSubcatPick(null)}/>
+        <SubcategoryPickerModal
+          item={activeMode==="internal"
+            ? {...items[subcatPick], subcategories: items[subcatPick].subcategories.map(s=>({...s,rate:0}))}
+            : items[subcatPick]}
+          deptCfg={cfg} onSelect={handleSubcatSelect} onCancel={()=>setSubcatPick(null)}/>
       )}
 
       {modal!==null&&(()=>{
@@ -1004,7 +1211,7 @@ function DeptTab({ dept, log, onLog, onBulkLog, onBulkComplete, deptItems, clubs
           cat: items[modal].cat,
           leagueSelect: items[modal].leagueSelect,
           multiLeagueSelect: items[modal].multiLeagueSelect,
-          rate: sub.rate,
+          rate: activeMode==="internal" ? 0 : sub.rate,
           index_score: sub.index_score,
           recurring: sub.recurring,
           examples: sub.examples,
@@ -1127,6 +1334,7 @@ const RACK_RATE_MAP = {
 };
 
 function getRackRate(entry) {
+  if (entry.type==="Internal") return 0;
   if (entry.rate && entry.rate > 0) return entry.rate;
   return RACK_RATE_MAP[entry.name] || RACK_RATE_MAP["default"];
 }
@@ -1290,11 +1498,22 @@ function YoYTrendCard({ log, clubClusters }) {
   } else {
     scoped.filter(e=>new Date(e.ts).getFullYear()===compareYear && selectedClubs.includes(e.club)).forEach(e=>pushInto(e.club,e));
   }
-  const seriesForKey = key => (monthBuckets[key]||Array.from({length:12},()=>[])).map(metricValue);
+  // null = no entries that month at all (a real gap), as opposed to a computed value
+  // of 0 for a month that has entries but sums to zero — those stay on the line.
+  const seriesForKey = key => (monthBuckets[key]||Array.from({length:12},()=>[])).map(entries => entries.length ? metricValue(entries) : null);
+  const buildSegments = series => {
+    const segments = []; let current = [];
+    series.forEach((v,m) => {
+      if (v==null) { if (current.length) segments.push(current); current = []; }
+      else current.push({ m, v });
+    });
+    if (current.length) segments.push(current);
+    return segments;
+  };
 
   let keys = [];
   if (compareMode==="years") keys = Object.keys(monthBuckets).map(Number).sort((a,b)=>a-b);
-  else if (compareMode==="leagues") keys = Object.keys(monthBuckets).sort(sortByLeagueOrder);
+  else if (compareMode==="leagues") keys = Object.keys(monthBuckets).filter(l=>l!=="USL HQ").sort(sortByLeagueOrder);
   else if (compareMode==="clusters") {
     const present = Object.keys(monthBuckets).sort();
     keys = selectedClusters.length ? selectedClusters.filter(c=>clusterOptions.includes(c)) : present;
@@ -1309,7 +1528,7 @@ function YoYTrendCard({ log, clubClusters }) {
   };
   const toggleKey = k => setHiddenKeys(prev=>{ const n=new Set(prev); n.has(k)?n.delete(k):n.add(k); return n; });
   const visibleKeys = keys.filter(k=>!hiddenKeys.has(k));
-  const maxVal = Math.max(1, ...visibleKeys.flatMap(k=>seriesForKey(k)));
+  const maxVal = Math.max(1, ...visibleKeys.flatMap(k=>seriesForKey(k)).filter(v=>v!=null));
 
   // YTD comparison only applies to years mode — there's no "prior period" to compare
   // against when comparing clusters/teams within a single chosen year.
@@ -1353,7 +1572,7 @@ function YoYTrendCard({ log, clubClusters }) {
       <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:16,paddingBottom:16,borderBottom:"1px solid #F3F4F6"}}>
         <span style={{fontSize:11,fontWeight:700,color:"#9CA3AF",letterSpacing:.5}}>COMPARE BY</span>
         {[["years","Years"],["leagues","Leagues"],["clusters","Clusters"],["clubs","Teams"]].map(([v,l])=>(
-          <button key={v} onClick={()=>{setCompareMode(v);setHiddenKeys(new Set());}} style={{padding:"6px 14px",borderRadius:8,border:`1.5px solid ${compareMode===v?"#011e5c":"#E5E7EB"}`,fontFamily:"'DM Sans',sans-serif",fontWeight:compareMode===v?700:400,fontSize:12,cursor:"pointer",background:compareMode===v?"#011e5c":"#fff",color:compareMode===v?"#fff":"#64748B"}}>{l}</button>
+          <button key={v} onClick={()=>{setCompareMode(v);setHiddenKeys(v==="leagues"?new Set(["Expansion"]):new Set());}} style={{padding:"6px 14px",borderRadius:8,border:`1.5px solid ${compareMode===v?"#011e5c":"#E5E7EB"}`,fontFamily:"'DM Sans',sans-serif",fontWeight:compareMode===v?700:400,fontSize:12,cursor:"pointer",background:compareMode===v?"#011e5c":"#fff",color:compareMode===v?"#fff":"#64748B"}}>{l}</button>
         ))}
         {compareMode!=="years"&&(
           <>
@@ -1419,9 +1638,19 @@ function YoYTrendCard({ log, clubClusters }) {
             ))}
             {visibleKeys.map(k=>{
               const idx=keys.indexOf(k);
-              const points=seriesForKey(k).map((v,m)=>`${xForMonth(m)},${yForVal(v)}`).join(" ");
+              const color=colorForKey(k,idx);
               const isCurrent=compareMode==="years"&&k===currentYear;
-              return <polyline key={k} points={points} fill="none" stroke={colorForKey(k,idx)} strokeWidth={isCurrent?3:1.5} strokeLinejoin="round" strokeLinecap="round" opacity={isCurrent?1:.8}/>;
+              const segments=buildSegments(seriesForKey(k));
+              return (
+                <g key={k}>
+                  {segments.map((seg,si)=>(
+                    <polyline key={si} points={seg.map(p=>`${xForMonth(p.m)},${yForVal(p.v)}`).join(" ")} fill="none" stroke={color} strokeWidth={isCurrent?3:1.5} strokeLinejoin="round" strokeLinecap="round" opacity={isCurrent?1:.8}/>
+                  ))}
+                  {segments.flat().map(p=>(
+                    <circle key={p.m} cx={xForMonth(p.m)} cy={yForVal(p.v)} r={isCurrent?3:2} fill={color} opacity={isCurrent?1:.8}/>
+                  ))}
+                </g>
+              );
             })}
           </svg>
 
@@ -1740,7 +1969,12 @@ function Dashboard({ log, onExport, clubsByLeague, clubClusters }) {
     return { label:l, value:leagueEntries.length, color:LEAGUE_COLORS[l], sub };
   }).filter(d=>d.value>0);
 
-  const CLUSTER_BUCKETS = [...clusterList, "No Cluster"];
+  // Rule: once a specific real cluster is selected (not "All Clusters"), never show
+  // Unassigned/No Cluster as a bucket alongside it — unless that's the exact thing picked.
+  const isUnassignedLike = cl => cl==="No Cluster" || cl==="Unassigned";
+  const CLUSTER_BUCKETS = [...clusterList, "No Cluster"].filter(cl =>
+    !isUnassignedLike(cl) || cluster==="all" || cluster===cl
+  );
   const clusterColor = cl => clusterColorFrom(cl, clusterList);
   const matchesCluster = (e,cl) => cl==="No Cluster" ? !clubClusters[e.club] : clubClusters[e.club]===cl;
 
@@ -2642,6 +2876,12 @@ function AppNav({ activeTab, setActiveTab, loading }) {
 const RETIRED_STAFF = ["Tim McCarthy"];
 const excludeRetiredStaff = data => data.filter(e => !RETIRED_STAFF.includes(e.staff));
 
+// Internal work never carries a dollar figure, no matter what's sitting in the sheet
+// (covers historical rows logged before this rule existed). New entries are also
+// written as $0 at logging time — see handleConfirm in DeptTab — so this is a
+// display-layer safety net, not the only place the rule is enforced.
+const zeroOutInternalRate = data => data.map(e => e.type==="Internal" ? { ...e, rate:0 } : e);
+
 export default function App() {
   const [unlocked,      setUnlocked]      = useState(()=>sessionStorage.getItem("dept_unlocked")==="1");
   const [activeTab,     setActiveTab]     = useState("Dashboard");
@@ -2659,7 +2899,7 @@ export default function App() {
         dbFetchDeliverables().catch(()=>[]),
         dbFetchClubs().catch(()=>[]),
       ]);
-      setLog(excludeRetiredStaff(logData));
+      setLog(zeroOutInternalRate(excludeRetiredStaff(logData)));
       if(delivData.length) {
         const built = buildDeptItems(delivData);
         // Only use sheet data if it actually produced items for known depts
@@ -2677,7 +2917,7 @@ export default function App() {
     if(!unlocked) return;
     loadAll();
     const interval=setInterval(()=>{
-      dbFetch().then(d=>setLog(excludeRetiredStaff(d))).catch(()=>{});
+      dbFetch().then(d=>setLog(zeroOutInternalRate(excludeRetiredStaff(d)))).catch(()=>{});
     },15000);
     return()=>clearInterval(interval);
   },[unlocked,loadAll]);
