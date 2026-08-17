@@ -64,7 +64,7 @@ const LEAGUE_TIER_OPTIONS = ["Championship","League One","Premier","Super League
 
 const INTERNAL_RECIPIENTS = {
   "Corp Partnerships":   ["HQ Corp Partnerships","League Operations"],
-  "Marketing":           ["HQ Marketing / Comms","Expansion","Onboarding"],
+  "Marketing":           ["HQ Marketing / Comms","Corp Partnerships","Expansion","Onboarding"],
   "Consumer Products":   ["Miscellaneous","Onboarding"],
   "Ticketing":           ["Miscellaneous","League Operations","Onboarding"],
   "League Initiatives":  ["League Operations"],
@@ -98,6 +98,19 @@ const sortByLeagueOrder = (a,b) => { const ia=LEAGUE_ORDER.indexOf(a), ib=LEAGUE
 // ─────────────────────────────────────────────────────────────────────────────
 
 const fmt$ = n => "$" + Number(n).toLocaleString();
+
+// Retroactive logging: convert a plain YYYY-MM-DD picker value into a timestamp set
+// to noon local time (avoids a midnight value silently rolling to the wrong day
+// depending on the browser's timezone/DST), and vice versa for the date input's default.
+const todayDateString = () => {
+  const d = new Date(), pad = n => String(n).padStart(2,"0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+};
+const dateStringToTs = dateStr => {
+  if (!dateStr) return Date.now();
+  const [y,m,d] = dateStr.split("-").map(Number);
+  return new Date(y, m-1, d, 12, 0, 0).getTime();
+};
 
 function normalizeDept(dept) {
   const MAP = {
@@ -526,7 +539,7 @@ function ExternalModal({ item, deptCfg, clubsByLeague, onConfirm, onCancel }) {
   const [singleSearch, setSingleSearch]= useState("");
   const [multiSearch,  setMultiSearch] = useState("");
   const [notes,        setNotes]       = useState("");
-
+  const [chosenDate,   setChosenDate]  = useState(todayDateString());
   const allFlat = Object.entries(clubsByLeague).flatMap(([league,clubs])=>clubs.map(club=>({club,league})));
   const toggleTier = l => setChosenTiers(prev=>prev.includes(l)?prev.filter(x=>x!==l):[...prev,l]);
   const getEntries = () => {
@@ -655,6 +668,12 @@ function ExternalModal({ item, deptCfg, clubsByLeague, onConfirm, onCancel }) {
             </div>
           </div>
         )}
+        {/* Date field — defaults to today, overridable for retroactive logging */}
+        <div style={{marginTop:8}}>
+          <label style={{display:"block",fontSize:12,fontWeight:700,color:"#6B7280",letterSpacing:.5,marginBottom:6}}>DATE OF WORK</label>
+          <input type="date" value={chosenDate} onChange={e=>setChosenDate(e.target.value)} max={todayDateString()}
+            style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,border:"1.5px solid #E5E7EB",borderRadius:8,padding:"9px 12px",outline:"none",color:"#374151",background:"#FAFAFA"}}/>
+        </div>
         {/* Notes field */}
         <div style={{marginTop:8}}>
           <label style={{display:"block",fontSize:12,fontWeight:700,color:"#6B7280",letterSpacing:.5,marginBottom:6}}>NOTES <span style={{fontWeight:400,color:"#9CA3AF"}}>(optional)</span></label>
@@ -663,7 +682,7 @@ function ExternalModal({ item, deptCfg, clubsByLeague, onConfirm, onCancel }) {
         </div>
 
         <div style={{display:"flex",gap:10,marginTop:12}}>
-          <button onClick={()=>count&&onConfirm(entries,notes)} disabled={!count} style={{flex:1,padding:11,border:"none",borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:14,color:"#fff",background:count?deptCfg.color:"#D1D5DB",cursor:count?"pointer":"not-allowed"}}>
+          <button onClick={()=>count&&onConfirm(entries,notes,dateStringToTs(chosenDate))} disabled={!count} style={{flex:1,padding:11,border:"none",borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:14,color:"#fff",background:count?deptCfg.color:"#D1D5DB",cursor:count?"pointer":"not-allowed"}}>
             {count>1?`Log ${count} Entries ▶`:"Confirm & Log ▶"}
           </button>
           <button onClick={onCancel} style={{padding:"11px 18px",border:"1.5px solid #E5E7EB",borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:600,fontSize:14,color:"#6B7280",background:"#fff",cursor:"pointer"}}>Cancel</button>
@@ -691,6 +710,7 @@ function BatchLogModal({ selection, activeMode, dept, deptCfg, clubsByLeague, on
   const [clubSearch, setClubSearch] = useState("");
   const [recipient, setRecipient] = useState("");
   const [notes, setNotes] = useState("");
+  const [chosenDate, setChosenDate] = useState(todayDateString());
 
   const allFlat = Object.entries(clubsByLeague).flatMap(([league,clubs])=>clubs.map(club=>({club,league})));
   const clubMatches = clubSearch ? allFlat.filter(({club})=>club.toLowerCase().includes(clubSearch.toLowerCase())) : [];
@@ -709,6 +729,7 @@ function BatchLogModal({ selection, activeMode, dept, deptCfg, clubsByLeague, on
     if (!canConfirm) return;
     const club = activeMode==="internal" ? recipient : chosenClub;
     const league = activeMode==="internal" ? "Internal" : leagueForClub(chosenClub,clubsByLeague);
+    const ts = dateStringToTs(chosenDate);
     const finalEntries = selection.map(({idx,item})=>{
       const sub = subcatChoices[idx];
       return {
@@ -716,7 +737,7 @@ function BatchLogModal({ selection, activeMode, dept, deptCfg, clubsByLeague, on
         rate: activeMode==="internal" ? 0 : sub.rate,
         type: activeMode==="internal"?"Internal":"External",
         cat:item.cat, index_score:sub.index_score||1, recurring:sub.recurring||false,
-        club, league, notes,
+        club, league, notes, ts,
       };
     });
     onConfirm(finalEntries);
@@ -794,6 +815,10 @@ function BatchLogModal({ selection, activeMode, dept, deptCfg, clubsByLeague, on
           </div>
         )}
 
+        <label style={{display:"block",fontSize:12,fontWeight:700,color:"#6B7280",letterSpacing:.5,marginBottom:6}}>DATE OF WORK <span style={{fontWeight:400,color:"#9CA3AF"}}>(applies to all {selection.length})</span></label>
+        <input type="date" value={chosenDate} onChange={e=>setChosenDate(e.target.value)} max={todayDateString()}
+          style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,border:"1.5px solid #E5E7EB",borderRadius:8,padding:"9px 12px",outline:"none",color:"#374151",background:"#FAFAFA",marginBottom:16}}/>
+
         <label style={{display:"block",fontSize:12,fontWeight:700,color:"#6B7280",letterSpacing:.5,marginBottom:6}}>NOTES <span style={{fontWeight:400,color:"#9CA3AF"}}>(applies to all {selection.length})</span></label>
         <textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Any additional context for this batch…" rows={2}
           style={{width:"100%",fontFamily:"'DM Sans',sans-serif",fontSize:13,border:"1.5px solid #E5E7EB",borderRadius:8,padding:"9px 12px",outline:"none",resize:"vertical",color:"#374151",background:"#FAFAFA"}}/>
@@ -814,6 +839,7 @@ function InternalModal({ item, deptCfg, dept, clubsByLeague, onConfirm, onCancel
   const [chosenLeague,   setChosenLeague]  = useState("");
   const [chosenTiers,    setChosenTiers]   = useState([]);
   const [notes,          setNotes]         = useState("");
+  const [chosenDate,     setChosenDate]    = useState(todayDateString());
   const recipients = INTERNAL_RECIPIENTS[dept]||[];
   const isLeagueSelect = item.leagueSelect;
   const isLeagueOpsTiers = recipient==="League Operations";
@@ -882,6 +908,13 @@ function InternalModal({ item, deptCfg, dept, clubsByLeague, onConfirm, onCancel
           </>
         )}
 
+        {/* Date field — defaults to today, overridable for retroactive logging */}
+        <div style={{marginTop:12}}>
+          <label style={{display:"block",fontSize:12,fontWeight:700,color:"#6B7280",letterSpacing:.5,marginBottom:6}}>DATE OF WORK</label>
+          <input type="date" value={chosenDate} onChange={e=>setChosenDate(e.target.value)} max={todayDateString()}
+            style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,border:"1.5px solid #E5E7EB",borderRadius:8,padding:"9px 12px",outline:"none",color:"#374151",background:"#FAFAFA"}}/>
+        </div>
+
         {/* Notes field */}
         <div style={{marginTop:12}}>
           <label style={{display:"block",fontSize:12,fontWeight:700,color:"#6B7280",letterSpacing:.5,marginBottom:6}}>NOTES <span style={{fontWeight:400,color:"#9CA3AF"}}>(optional)</span></label>
@@ -890,7 +923,7 @@ function InternalModal({ item, deptCfg, dept, clubsByLeague, onConfirm, onCancel
         </div>
 
         <div style={{display:"flex",gap:10,marginTop:12}}>
-          <button onClick={()=>count&&onConfirm(entries,notes)} disabled={!count} style={{flex:1,padding:11,border:"none",borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:14,color:"#fff",background:count?deptCfg.color:"#D1D5DB",cursor:count?"pointer":"not-allowed"}}>
+          <button onClick={()=>count&&onConfirm(entries,notes,dateStringToTs(chosenDate))} disabled={!count} style={{flex:1,padding:11,border:"none",borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:14,color:"#fff",background:count?deptCfg.color:"#D1D5DB",cursor:count?"pointer":"not-allowed"}}>
             {count>1?`Log ${count} Entries ▶`:"Confirm & Log ▶"}
           </button>
           <button onClick={onCancel} style={{padding:"11px 18px",border:"1.5px solid #E5E7EB",borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontWeight:600,fontSize:14,color:"#6B7280",background:"#fff",cursor:"pointer"}}>Cancel</button>
@@ -1070,7 +1103,7 @@ function DeptTab({ dept, log, onLog, onBulkLog, onBulkComplete, deptItems, clubs
     setSubcatPick(null);
   };
 
-  const handleConfirm=async (entries, notes="")=>{
+  const handleConfirm=async (entries, notes="", ts=Date.now())=>{
     const item=items[modal];
     const sub=selectedSubcat||item.subcategories[0];
     // Internal work never carries a dollar figure — enforced here at write time so the
@@ -1080,7 +1113,7 @@ function DeptTab({ dept, log, onLog, onBulkLog, onBulkComplete, deptItems, clubs
     const total=entries.length;
     if(total===1){
       const{club,league}=entries[0];
-      await onLog({dept,name:item.name,subcat:sub.subcat,rate,type:activeMode==="internal"?"Internal":"External",cat:item.cat,index_score:sub.index_score||1,recurring:sub.recurring||false,staff:staffName,club,league,notes,bulkSilent:false});
+      await onLog({dept,name:item.name,subcat:sub.subcat,rate,type:activeMode==="internal"?"Internal":"External",cat:item.cat,index_score:sub.index_score||1,recurring:sub.recurring||false,staff:staffName,club,league,notes,ts,bulkSilent:false});
     } else {
       // Build all entries first, add to UI optimistically, then send as one batch request
       const newEntries = entries.map(({club,league})=>({
@@ -1089,7 +1122,7 @@ function DeptTab({ dept, log, onLog, onBulkLog, onBulkComplete, deptItems, clubs
         cat:item.cat,index_score:sub.index_score||1,
         recurring:sub.recurring||false,staff:staffName,club,league,notes,
         id:`${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        ts:Date.now(),
+        ts,
       }));
       // Add all to UI at once
       onBulkLog(newEntries);
@@ -1115,7 +1148,7 @@ function DeptTab({ dept, log, onLog, onBulkLog, onBulkComplete, deptItems, clubs
     const newEntries = finalEntries.map(e=>({
       ...e, staff:staffName,
       id:`${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      ts:Date.now(),
+      ts: e.ts || Date.now(),
     }));
     onBulkLog(newEntries);
     try {
@@ -2923,7 +2956,7 @@ export default function App() {
   },[unlocked,loadAll]);
 
   const handleLog=useCallback(async entry=>{
-    const newEntry={...entry,id:`${Date.now()}-${Math.random().toString(36).slice(2)}`,ts:Date.now()};
+    const newEntry={...entry,id:`${Date.now()}-${Math.random().toString(36).slice(2)}`,ts:entry.ts||Date.now()};
     // Strip internal flags before storing
     const {bulkSilent,...logEntry} = newEntry;
     setLog(prev=>[...prev,logEntry]);
