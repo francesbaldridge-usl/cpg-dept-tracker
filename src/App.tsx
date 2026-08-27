@@ -63,11 +63,11 @@ const FALLBACK_CLUBS = {
 const LEAGUE_TIER_OPTIONS = ["Championship","League One","Premier","Super League","Expansion","USL HQ"];
 
 const INTERNAL_RECIPIENTS = {
-  "Corp Partnerships":   ["HQ Corp Partnerships","League Operations"],
+  "Corp Partnerships":   ["HQ Corp Partnerships","League Operations","Expansion"],
   "Marketing":           ["HQ Marketing / Comms","Corp Partnerships","Expansion","Onboarding"],
   "Consumer Products":   ["Miscellaneous","Onboarding"],
-  "Ticketing":           ["Miscellaneous","League Operations","Onboarding"],
-  "League Initiatives":  ["League Operations"],
+  "Ticketing":           ["Miscellaneous","League Operations","Expansion","Onboarding"],
+  "League Initiatives":  ["League Operations","Expansion"],
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1075,11 +1075,14 @@ function DeptTab({ dept, log, onLog, onBulkLog, onBulkComplete, deptItems, clubs
   const [selectedSubcat,setSelectedSubcat]=useState(null);
   const [modal,setModal]=useState(null);
   const [pulsingIdx,setPulsingIdx]=useState(null);
-  const [batchSelected,setBatchSelected]=useState([]);
+  const [batchSelected,setBatchSelected]=useState({external:[],internal:[]});
   const [showBatchModal,setShowBatchModal]=useState(false);
 
   const deptData=deptItems[dept]||{external:[],internal:[]};
   const activeMode=isIntOnly?"internal":mode;
+  const currentBatchSelected = batchSelected[activeMode]||[];
+  const otherMode = activeMode==="internal" ? "external" : "internal";
+  const otherModeCount = (batchSelected[otherMode]||[]).length;
   const items=activeMode==="internal"?deptData.internal:deptData.external;
   // Internal work never shows a price on the browsing cards either — the write path
   // already forces $0 regardless, this just keeps what's displayed consistent with that.
@@ -1139,12 +1142,15 @@ function DeptTab({ dept, log, onLog, onBulkLog, onBulkComplete, deptItems, clubs
   const toggleBatchSelect = idx => {
     if(!staffName){setNameErr(true);return;}
     setNameErr(false);
-    setBatchSelected(prev => prev.includes(idx) ? prev.filter(i=>i!==idx) : [...prev,idx]);
+    setBatchSelected(prev => {
+      const cur = prev[activeMode]||[];
+      return { ...prev, [activeMode]: cur.includes(idx) ? cur.filter(i=>i!==idx) : [...cur,idx] };
+    });
   };
 
   const handleBatchConfirm = async finalEntries => {
     setShowBatchModal(false);
-    setBatchSelected([]);
+    setBatchSelected(prev => ({...prev, [activeMode]: []}));
     const newEntries = finalEntries.map(e=>({
       ...e, staff:staffName,
       id:`${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -1177,11 +1183,15 @@ function DeptTab({ dept, log, onLog, onBulkLog, onBulkComplete, deptItems, clubs
         {nameErr&&<span style={{color:"#EF4444",fontSize:13,fontWeight:600}}>⚠ Select your name first</span>}
         {isToggle&&(
           <div style={{display:"flex",background:"#F1F5F9",borderRadius:10,padding:3,gap:2}}>
-            {["external","internal"].map(m=>(
-              <button key={m} onClick={()=>{setMode(m);setBatchSelected([]);}} style={{padding:"7px 16px",borderRadius:8,border:"none",fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:12,cursor:"pointer",background:activeMode===m?cfg.color:"transparent",color:activeMode===m?"#fff":"#64748B",transition:"all .15s"}}>
-                {m==="external"?"External":"Internal"}
-              </button>
-            ))}
+            {["external","internal"].map(m=>{
+              const pending=(batchSelected[m]||[]).length;
+              return(
+                <button key={m} onClick={()=>setMode(m)} style={{position:"relative",padding:"7px 16px",borderRadius:8,border:"none",fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:12,cursor:"pointer",background:activeMode===m?cfg.color:"transparent",color:activeMode===m?"#fff":"#64748B",transition:"all .15s"}}>
+                  {m==="external"?"External":"Internal"}
+                  {pending>0&&<span style={{position:"absolute",top:-6,right:-6,background:"#f51200",color:"#fff",borderRadius:99,fontSize:10,fontWeight:700,minWidth:16,height:16,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 4px"}}>{pending}</span>}
+                </button>
+              );
+            })}
           </div>
         )}
         {isIntOnly&&<span style={{fontSize:12,fontWeight:700,color:cfg.color,background:cfg.light,border:`1px solid ${cfg.border}`,borderRadius:8,padding:"5px 12px"}}>Internal Only</span>}
@@ -1208,14 +1218,17 @@ function DeptTab({ dept, log, onLog, onBulkLog, onBulkComplete, deptItems, clubs
 
       {items.length===0
         ?<div style={{textAlign:"center",padding:"40px 0",color:"#9CA3AF",fontFamily:"'DM Sans',sans-serif"}}>No {activeMode} deliverables found — check your Google Sheet.</div>
-        :<CategoryGroupedCards items={displayItems} log={log} dept={dept} cfg={cfg} pulsingIdx={pulsingIdx} onLogClick={handleLogClick} batchSelected={batchSelected} onToggleBatch={toggleBatchSelect}/>
+        :<CategoryGroupedCards items={displayItems} log={log} dept={dept} cfg={cfg} pulsingIdx={pulsingIdx} onLogClick={handleLogClick} batchSelected={currentBatchSelected} onToggleBatch={toggleBatchSelect}/>
       }
 
-      {batchSelected.length>0&&(
-        <div style={{position:"sticky",bottom:20,marginTop:20,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,background:"#011e5c",borderRadius:12,padding:"12px 20px",boxShadow:"0 8px 24px rgba(0,0,0,.25)"}}>
-          <span style={{color:"#fff",fontSize:14,fontWeight:600}}>{batchSelected.length} deliverable{batchSelected.length>1?"s":""} selected</span>
+      {currentBatchSelected.length>0&&(
+        <div style={{position:"sticky",bottom:20,marginTop:20,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,background:"#011e5c",borderRadius:12,padding:"12px 20px",boxShadow:"0 8px 24px rgba(0,0,0,.25)",flexWrap:"wrap"}}>
+          <span style={{color:"#fff",fontSize:14,fontWeight:600}}>
+            {currentBatchSelected.length} deliverable{currentBatchSelected.length>1?"s":""} selected
+            {otherModeCount>0&&<span style={{color:"#9DB4E0",fontWeight:400,marginLeft:8}}>· {otherModeCount} {otherMode} still waiting</span>}
+          </span>
           <div style={{display:"flex",gap:10}}>
-            <button onClick={()=>setBatchSelected([])} style={{background:"transparent",border:"1.5px solid #3B5A94",color:"#C7D2FE",borderRadius:8,padding:"8px 16px",fontFamily:"'DM Sans',sans-serif",fontWeight:600,fontSize:13,cursor:"pointer"}}>Clear</button>
+            <button onClick={()=>setBatchSelected(prev=>({...prev,[activeMode]:[]}))} style={{background:"transparent",border:"1.5px solid #3B5A94",color:"#C7D2FE",borderRadius:8,padding:"8px 16px",fontFamily:"'DM Sans',sans-serif",fontWeight:600,fontSize:13,cursor:"pointer"}}>Clear</button>
             <button onClick={()=>setShowBatchModal(true)} style={{background:"#f51200",border:"none",color:"#fff",borderRadius:8,padding:"8px 18px",fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:13,cursor:"pointer"}}>Log Selected ▶</button>
           </div>
         </div>
@@ -1223,7 +1236,7 @@ function DeptTab({ dept, log, onLog, onBulkLog, onBulkComplete, deptItems, clubs
 
       {showBatchModal&&(
         <BatchLogModal
-          selection={batchSelected.map(idx=>({idx,item:items[idx]}))}
+          selection={currentBatchSelected.map(idx=>({idx,item:items[idx]}))}
           activeMode={activeMode} dept={dept} deptCfg={cfg} clubsByLeague={clubsByLeague}
           onConfirm={handleBatchConfirm} onCancel={()=>setShowBatchModal(false)}
         />
